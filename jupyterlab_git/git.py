@@ -6,6 +6,7 @@ import os
 import re
 import subprocess
 from urllib.parse import unquote
+from uuid import uuid4
 
 import pexpect
 import tornado
@@ -909,6 +910,17 @@ class Git:
         Execute dvc init command & return the result.
         """
         cmd = ["dvc", "init"]
+        code, _, error = await execute(
+            cmd, cwd=os.path.join(self.root_dir, current_path)
+        )
+        cmd = [
+            "dvc",
+            "remote",
+            "add",
+            "-d",
+            "myremote",
+            f"/tmp/dvc-storage-{str(uuid4())[:8]}",
+        ]
         code, _, error = await execute(
             cmd, cwd=os.path.join(self.root_dir, current_path)
         )
