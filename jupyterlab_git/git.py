@@ -892,6 +892,23 @@ class Git:
 
         return response
 
+    async def dvc_push(self, curr_fb_path):
+        """
+        Execute `git push $UPSTREAM $BRANCH`. The choice of upstream and branch is up to the caller.
+        """
+        env = os.environ.copy()
+        env["GIT_TERMINAL_PROMPT"] = "1"
+        code, _, error = await execute(
+            ["dvc", "push"], cwd=os.path.join(self.root_dir, curr_fb_path), env=env,
+        )
+
+        response = {"code": code}
+
+        if code != 0:
+            response["message"] = error.strip()
+
+        return response
+
     async def init(self, current_path):
         """
         Execute git init command & return the result.

@@ -497,6 +497,24 @@ class GitPushHandler(GitHandler):
         self.finish(json.dumps(response))
 
 
+class DvcPushHandler(GitHandler):
+    """
+    Handler for 'git push <first-branch> <second-branch>.
+    Pushes committed files to a remote branch.
+    """
+
+    @web.authenticated
+    async def post(self):
+        """
+        POST request handler,
+        pushes committed files from your current branch to a remote branch
+        """
+        data = self.get_json_body()
+        current_path = data["current_path"]
+        response = await self.git.dvc_push(current_path)
+        self.finish(json.dumps(response))
+
+
 class GitInitHandler(GitHandler):
     """
     Handler for 'git init'. Initializes a repository.
@@ -619,6 +637,7 @@ def setup_handlers(web_app):
         ("/git/log", GitLogHandler),
         ("/git/pull", GitPullHandler),
         ("/git/push", GitPushHandler),
+        ("/dvc/push", DvcPushHandler),
         ("/git/remote/add", GitRemoteAddHandler),
         ("/git/reset", GitResetHandler),
         ("/git/reset_to_commit", GitResetToCommitHandler),

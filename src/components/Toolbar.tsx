@@ -196,6 +196,11 @@ export class Toolbar extends React.Component<IToolbarProps, IToolbarState> {
           title={'Refresh the repository to detect local and remote changes'}
           onClick={this._onRefreshClick}
         />
+        <button
+          className={classes(toolbarButtonClass, pushButtonClass, 'jp-Icon-16')}
+          title={'Push DVC files'}
+          onClick={this._onDvcPushClick}
+        />
       </div>
     );
   }
@@ -344,6 +349,21 @@ export class Toolbar extends React.Component<IToolbarProps, IToolbarState> {
         `Encountered an error when pushing changes. Error: ${reason}`
       );
     });
+  };
+
+  /**
+   * Callback invoked upon clicking a button to push the latest DVC changes.
+   *
+   * @param event - event object
+   */
+  private _onDvcPushClick = (): void => {
+    showGitOperationDialog(this.props.model, Operation.DvcPush).catch(
+      reason => {
+        console.error(
+          `Encountered an error when pushing changes. Error: ${reason}`
+        );
+      }
+    );
   };
 
   /**
