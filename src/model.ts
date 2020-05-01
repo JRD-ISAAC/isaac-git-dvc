@@ -236,6 +236,31 @@ export class GitExtension implements IGitExtension {
     return Promise.resolve(response);
   }
 
+  async dvc_add(...filename: string[]): Promise<Response> {
+    await this.ready;
+    const path = this.pathRepository;
+
+    if (path === null) {
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            code: -1,
+            message: 'Not in a git repository.'
+          })
+        )
+      );
+    }
+
+    const response = await httpGitRequest('/dvc/add', 'POST', {
+      add_all: !filename,
+      filename: filename || '',
+      top_repo_path: path
+    });
+
+    this.refreshStatus();
+    return Promise.resolve(response);
+  }
+
   /**
    * Make request to add all unstaged files into
    * the staging area in repository 'path'

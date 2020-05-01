@@ -631,6 +631,21 @@ class Git:
         if code != 0:
             return {"code": code, "command": " ".join(cmd), "message": error}
         return {"code": code}
+    
+    async def dvc_add(self, filename, top_repo_path):
+        """
+        Execute dvc add<filename> command & return the result.
+        """
+        if not isinstance(filename, str):
+            # assume filename is a sequence of str
+            cmd = ["dvc", "add"] + list(filename)
+        else:
+            cmd = ["dvc", "add", filename]
+        code, _, error = await execute(cmd, cwd=top_repo_path)
+
+        if code != 0:
+            return {"code": code, "command": " ".join(cmd), "message": error}
+        return {"code": code}
 
     async def add_all_unstaged(self, top_repo_path):
         """

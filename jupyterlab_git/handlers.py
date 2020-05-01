@@ -225,6 +225,28 @@ class GitAddHandler(GitHandler):
             self.set_status(500)
         self.finish(json.dumps(body))
 
+class DvcAddHandler(GitHandler):
+    """
+    Handler for dvc add <filename>'.
+    Adds one or all files to the staging area.
+    """
+
+    @web.authenticated
+    async def post(self):
+        """
+        POST request handler, adds one or all files into the staging area.
+        """
+        data = self.get_json_body()
+        top_repo_path = data["top_repo_path"]
+        if data["add_all"]:
+            body = await self.git.add_all(top_repo_path)
+        else:
+            filename = data["filename"]
+            body = await self.git.dvc_add(filename, top_repo_path)
+
+        if body["code"] != 0:
+            self.set_status(500)
+        self.finish(json.dumps(body))
 
 class GitAddAllUnstagedHandler(GitHandler):
     """
@@ -576,6 +598,7 @@ def setup_handlers(web_app):
         ("/git/show_top_level", GitShowTopLevelHandler),
         ("/git/status", GitStatusHandler),
         ("/git/upstream", GitUpstreamHandler),
+        ("/dvc/add", DvcAddHandler),
     ]
 
     # add the baseurl to our paths

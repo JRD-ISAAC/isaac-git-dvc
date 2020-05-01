@@ -66,6 +66,8 @@ export interface IGitExtension extends IDisposable {
    */
   add(...filename: string[]): Promise<Response>;
 
+  dvc_add(...filename: string[]): Promise<Response>;
+
   /**
    * Make request to add all unstaged files into
    * the staging area in repository 'path'

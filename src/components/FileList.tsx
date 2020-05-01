@@ -23,6 +23,7 @@ export namespace CommandIDs {
   export const gitFileDiscard = 'git:context-discard';
   export const gitFileDiffWorking = 'git:context-diffWorking';
   export const gitFileDiffIndex = 'git:context-diffIndex';
+  export const dvcFileAdd = 'dvc:context-add';
 }
 
 export interface IFileListState {
@@ -117,6 +118,16 @@ export class FileList extends React.Component<IFileListProps, IFileListState> {
       });
     }
 
+    if (!commands.hasCommand(CommandIDs.dvcFileAdd)) {
+      commands.addCommand(CommandIDs.dvcFileAdd, {
+        label: 'DVC Add',
+        caption: 'Start tracking selected file with DVC',
+        execute: () => {
+          this.dvcAddFile(this.state.selectedFile.to);
+        }
+      });
+    }
+
     if (!commands.hasCommand(CommandIDs.gitFileUnstage)) {
       commands.addCommand(CommandIDs.gitFileUnstage, {
         label: 'Unstage',
@@ -156,7 +167,11 @@ export class FileList extends React.Component<IFileListProps, IFileListState> {
       this._contextMenuUnstaged.addItem({ command });
     });
 
-    [CommandIDs.gitFileOpen, CommandIDs.gitFileTrack].forEach(command => {
+    [
+      CommandIDs.gitFileOpen,
+      CommandIDs.gitFileTrack,
+      CommandIDs.dvcFileAdd
+    ].forEach(command => {
       this._contextMenuUntracked.addItem({ command });
     });
   }
@@ -231,6 +246,11 @@ export class FileList extends React.Component<IFileListProps, IFileListState> {
   /** Add a specific unstaged file */
   addFile = async (...file: string[]) => {
     await this.props.model.add(...file);
+  };
+
+  /** Add a specific unstaged data file to DVC */
+  dvcAddFile = async (...file: string[]) => {
+    await this.props.model.dvc_add(...file);
   };
 
   /** Discard changes in a specific unstaged or staged file */
