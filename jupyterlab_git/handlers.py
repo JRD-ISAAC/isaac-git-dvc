@@ -4,12 +4,15 @@ Module with all the individual handlers, which execute git commands and return t
 import json
 import os
 from pathlib import Path
+
 from tornado import web
 
 from notebook.base.handlers import APIHandler
-from notebook.utils import url_path_join as ujoin, url2path
+from notebook.utils import url2path
+from notebook.utils import url_path_join as ujoin
 
 from .git import DEFAULT_REMOTE_NAME
+
 
 class GitHandler(APIHandler):
     """
@@ -225,6 +228,7 @@ class GitAddHandler(GitHandler):
             self.set_status(500)
         self.finish(json.dumps(body))
 
+
 class DvcAddHandler(GitHandler):
     """
     Handler for dvc add <filename>'.
@@ -247,6 +251,7 @@ class DvcAddHandler(GitHandler):
         if body["code"] != 0:
             self.set_status(500)
         self.finish(json.dumps(body))
+
 
 class GitAddAllUnstagedHandler(GitHandler):
     """
@@ -292,7 +297,7 @@ class GitRemoteAddHandler(GitHandler):
         name = data.get("name", DEFAULT_REMOTE_NAME)
         url = data["url"]
         output = self.git.remote_add(top_repo_path, url, name)
-        if(output["code"] == 0):
+        if output["code"] == 0:
             self.set_status(201)
         else:
             self.set_status(500)
@@ -438,7 +443,11 @@ class GitPullHandler(GitHandler):
         POST request handler, pulls files from a remote branch to your current branch.
         """
         data = self.get_json_body()
-        response = await self.git.pull(data["current_path"], data.get("auth", None), data.get("cancel_on_conflict", False))
+        response = await self.git.pull(
+            data["current_path"],
+            data.get("auth", None),
+            data.get("cancel_on_conflict", False),
+        )
 
         self.finish(json.dumps(response))
 
@@ -500,6 +509,25 @@ class GitInitHandler(GitHandler):
         """
         current_path = self.get_json_body()["current_path"]
         body = await self.git.init(current_path)
+
+        if body["code"] != 0:
+            self.set_status(500)
+
+        self.finish(json.dumps(body))
+
+
+class DvcInitHandler(GitHandler):
+    """
+    Handler for 'git init'. Initializes a repository.
+    """
+
+    @web.authenticated
+    async def post(self):
+        """
+        POST request handler, initializes a repository.
+        """
+        current_path = self.get_json_body()["current_path"]
+        body = await self.git.dvc_init(current_path)
 
         if body["code"] != 0:
             self.set_status(500)
@@ -587,6 +615,7 @@ def setup_handlers(web_app):
         ("/git/diff", GitDiffHandler),
         ("/git/diffcontent", GitDiffContentHandler),
         ("/git/init", GitInitHandler),
+        ("/dvc/init", DvcInitHandler),
         ("/git/log", GitLogHandler),
         ("/git/pull", GitPullHandler),
         ("/git/push", GitPushHandler),

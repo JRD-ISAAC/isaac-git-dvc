@@ -141,6 +141,7 @@ function createGitMenu(
     CommandIDs.gitUI,
     CommandIDs.gitTerminalCommand,
     CommandIDs.gitInit,
+    CommandIDs.dvcInit,
     CommandIDs.gitClone,
     CommandIDs.gitAddRemote
   ].forEach(command => {

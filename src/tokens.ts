@@ -194,6 +194,13 @@ export interface IGitExtension extends IDisposable {
   init(path: string): Promise<Response>;
 
   /**
+   * Make request to initialize a  dvc repository at path 'path'
+   *
+   * @param path Folder path to initialize as a git repository.
+   */
+  dvc_init(path: string): Promise<Response>;
+
+  /**
    * Make request for git commit logs
    *
    * @param historyCount: Optional number of commits to get from git log

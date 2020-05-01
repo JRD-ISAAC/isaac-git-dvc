@@ -719,6 +719,27 @@ export class GitExtension implements IGitExtension {
   }
 
   /**
+   * Make request to initialize a  dvc repository at path 'path'
+   *
+   * @param path Folder path to initialize as a dvc repository.
+   */
+  async dvc_init(path: string): Promise<Response> {
+    try {
+      const response = await httpGitRequest('/dvc/init', 'POST', {
+        current_path: path
+      });
+      if (response.status !== 200) {
+        return response.json().then((data: any) => {
+          throw new ServerConnection.ResponseError(response, data.message);
+        });
+      }
+      return response;
+    } catch (err) {
+      throw new ServerConnection.NetworkError(err);
+    }
+  }
+
+  /**
    * Make request for git commit logs
    *
    * @param historyCount: Optional number of commits to get from git log

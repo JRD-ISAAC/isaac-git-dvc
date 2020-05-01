@@ -1,6 +1,7 @@
 """
 Module for executing git commands, sending results back to the handlers
 """
+import datetime
 import os
 import re
 import subprocess
@@ -9,11 +10,9 @@ from urllib.parse import unquote
 import pexpect
 import tornado
 import tornado.locks
-import datetime
-
 
 # Git configuration options exposed through the REST API
-ALLOWED_OPTIONS = ['user.name', 'user.email']
+ALLOWED_OPTIONS = ["user.name", "user.email"]
 # Regex pattern to capture (key, value) of Git configuration options.
 # See https://git-scm.com/docs/git-config#_syntax for git var syntax
 CONFIG_PATTERN = re.compile(r"(?:^|\n)([\w\-\.]+)\=")
@@ -26,6 +25,7 @@ MAX_WAIT_FOR_LOCK_S = 5
 CHECK_LOCK_INTERVAL_S = 0.1
 
 execution_lock = tornado.locks.Lock()
+
 
 async def execute(
     cmdline: "List[str]",
@@ -55,7 +55,12 @@ async def execute(
     ) -> "Tuple[int, str, str]":
         try:
             p = pexpect.spawn(
-                cmdline[0], cmdline[1:], cwd=cwd, env=env, encoding="utf-8", timeout=None
+                cmdline[0],
+                cmdline[1:],
+                cwd=cwd,
+                env=env,
+                encoding="utf-8",
+                timeout=None,
             )
 
             # We expect a prompt from git
@@ -95,14 +100,16 @@ async def execute(
         return (process.returncode, output.decode("utf-8"), error.decode("utf-8"))
 
     try:
-        await execution_lock.acquire(timeout=datetime.timedelta(seconds=MAX_WAIT_FOR_EXECUTE_S))
-    except  tornado.util.TimeoutError:
+        await execution_lock.acquire(
+            timeout=datetime.timedelta(seconds=MAX_WAIT_FOR_EXECUTE_S)
+        )
+    except tornado.util.TimeoutError:
         return (1, "", "Unable to get the lock on the directory")
 
     try:
         # Ensure our execution operation will succeed by first checking and waiting for the lock to be removed
         time_slept = 0
-        lockfile = os.path.join(cwd, '.git', 'index.lock')
+        lockfile = os.path.join(cwd, ".git", "index.lock")
         while os.path.exists(lockfile) and time_slept < MAX_WAIT_FOR_LOCK_S:
             await tornado.gen.sleep(CHECK_LOCK_INTERVAL_S)
             time_slept += CHECK_LOCK_INTERVAL_S
@@ -111,11 +118,7 @@ async def execute(
 
         if username is not None and password is not None:
             code, output, error = await call_subprocess_with_authentication(
-                cmdline,
-                username,
-                password,
-                cwd,
-                env,
+                cmdline, username, password, cwd, env,
             )
         else:
             current_loop = tornado.ioloop.IOLoop.current()
@@ -177,7 +180,9 @@ class Git:
             else:
                 raw = output.strip()
                 s = CONFIG_PATTERN.split(raw)
-                response["options"] = {k:v for k, v in zip(s[1::2], s[2::2]) if k in ALLOWED_OPTIONS}
+                response["options"] = {
+                    k: v for k, v in zip(s[1::2], s[2::2]) if k in ALLOWED_OPTIONS
+                }
 
         return response
 
@@ -288,7 +293,7 @@ class Git:
             "--numstat",
             "-z",
             "--cached",
-            "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+            "4b825dc642cb6eb9a060e54bf8d69288fbee4904",
         ]
         text_code, text_output, _ = await execute(
             command, cwd=os.path.join(self.root_dir, current_path),
@@ -299,19 +304,21 @@ class Git:
             for line in filter(lambda l: len(l) > 0, strip_and_split(text_output)):
                 diff, name = line.rsplit("\t", maxsplit=1)
                 are_binary[name] = diff.startswith("-\t-")
-        
+
         result = []
         line_iterable = (line for line in strip_and_split(my_output) if line)
         for line in line_iterable:
             name = line[3:]
-            result.append({
-                "x": line[0],
-                "y": line[1],
-                "to": name,
-                # if file was renamed, next line contains original path
-                "from": next(line_iterable) if line[0]=='R' else name,
-                "is_binary": are_binary.get(name, None)
-            })
+            result.append(
+                {
+                    "x": line[0],
+                    "y": line[1],
+                    "to": name,
+                    # if file was renamed, next line contains original path
+                    "from": next(line_iterable) if line[0] == "R" else name,
+                    "is_binary": are_binary.get(name, None),
+                }
+            )
         return {"code": code, "files": result}
 
     async def log(self, current_path, history_count=10):
@@ -377,11 +384,11 @@ class Git:
         line_iterable = iter(strip_and_split(my_output)[1:])
         for line in line_iterable:
             is_binary = line.startswith("-\t-\t")
-            insertions, deletions, file = line.split('\t')
-            insertions = insertions.replace('-', '0')
-            deletions = deletions.replace('-', '0')
+            insertions, deletions, file = line.split("\t")
+            insertions = insertions.replace("-", "0")
+            deletions = deletions.replace("-", "0")
 
-            if file == '':
+            if file == "":
                 # file was renamed or moved, we need next two lines of output
                 from_path = next(line_iterable)
                 to_path = next(line_iterable)
@@ -391,20 +398,23 @@ class Git:
                 modified_file_name = file.split("/")[-1]
                 modified_file_path = file
 
-            result.append({
-                "modified_file_path": modified_file_path,
-                "modified_file_name": modified_file_name,
-                "insertion": insertions,
-                "deletion": deletions,
-                "is_binary": is_binary
-            })
+            result.append(
+                {
+                    "modified_file_path": modified_file_path,
+                    "modified_file_name": modified_file_name,
+                    "insertion": insertions,
+                    "deletion": deletions,
+                    "is_binary": is_binary,
+                }
+            )
             total_insertions += int(insertions)
             total_deletions += int(deletions)
 
         modified_file_note = "{num_files} files changed, {insertions} insertions(+), {deletions} deletions(-)".format(
             num_files=len(result),
             insertions=total_insertions,
-            deletions=total_deletions)
+            deletions=total_deletions,
+        )
 
         return {
             "code": code,
@@ -548,9 +558,7 @@ class Git:
 
         results = []
         try:
-            for name, commit_sha in (
-                line.split("\t") for line in output.splitlines()
-            ):
+            for name, commit_sha in (line.split("\t") for line in output.splitlines()):
                 results.append(
                     {
                         "is_current_branch": False,
@@ -575,8 +583,7 @@ class Git:
         """
         cmd = ["git", "rev-parse", "--show-toplevel"]
         code, my_output, my_error = await execute(
-            cmd,
-            cwd=os.path.join(self.root_dir, current_path),
+            cmd, cwd=os.path.join(self.root_dir, current_path),
         )
         if code == 0:
             return {"code": code, "top_repo_path": my_output.strip("\n")}
@@ -593,8 +600,7 @@ class Git:
         """
         cmd = ["git", "rev-parse", "--show-prefix"]
         code, my_output, my_error = await execute(
-            cmd,
-            cwd=os.path.join(self.root_dir, current_path),
+            cmd, cwd=os.path.join(self.root_dir, current_path),
         )
         if code == 0:
             result = {"code": code, "under_repo_path": my_output.strip("\n")}
@@ -631,7 +637,7 @@ class Git:
         if code != 0:
             return {"code": code, "command": " ".join(cmd), "message": error}
         return {"code": code}
-    
+
     async def dvc_add(self, filename, top_repo_path):
         """
         Execute dvc add<filename> command & return the result.
@@ -668,7 +674,7 @@ class Git:
 
         untracked = []
         for f in status["files"]:
-            if f["x"]=="?" and f["y"]=="?":
+            if f["x"] == "?" and f["y"] == "?":
                 untracked.append(f["from"].strip('"'))
 
         return await self.add(untracked, top_repo_path)
@@ -834,14 +840,19 @@ class Git:
 
         if code != 0:
             output = output.strip()
-            has_conflict = "automatic merge failed; fix conflicts and then commit the result." in output.lower()
+            has_conflict = (
+                "automatic merge failed; fix conflicts and then commit the result."
+                in output.lower()
+            )
             if cancel_on_conflict and has_conflict:
                 code, _, error = await execute(
                     ["git", "merge", "--abort"],
-                    cwd=os.path.join(self.root_dir, curr_fb_path)
+                    cwd=os.path.join(self.root_dir, curr_fb_path),
                 )
                 if code == 0:
-                    response["message"] = "Unable to pull latest changes as doing so would result in a merge conflict. In order to push your local changes, you may want to consider creating a new branch based on your current work and pushing the new branch. Provided your repository is hosted (e.g., on GitHub), once pushed, you can create a pull request against the original branch on the remote repository and manually resolve the conflicts during pull request review."
+                    response[
+                        "message"
+                    ] = "Unable to pull latest changes as doing so would result in a merge conflict. In order to push your local changes, you may want to consider creating a new branch based on your current work and pushing the new branch. Provided your repository is hosted (e.g., on GitHub), once pushed, you can create a pull request against the original branch on the remote repository and manually resolve the conflicts during pull request review."
                 else:
                     response["message"] = error.strip()
             elif has_conflict:
@@ -885,6 +896,19 @@ class Git:
         Execute git init command & return the result.
         """
         cmd = ["git", "init"]
+        code, _, error = await execute(
+            cmd, cwd=os.path.join(self.root_dir, current_path)
+        )
+
+        if code != 0:
+            return {"code": code, "command": " ".join(cmd), "message": error}
+        return {"code": code}
+
+    async def dvc_init(self, current_path):
+        """
+        Execute dvc init command & return the result.
+        """
+        cmd = ["dvc", "init"]
         code, _, error = await execute(
             cmd, cwd=os.path.join(self.root_dir, current_path)
         )
@@ -1034,7 +1058,9 @@ class Git:
         """
         is_binary = await self._is_binary(filename, prev_ref["git"], top_repo_path)
         if is_binary:
-            raise tornado.web.HTTPError(log_message="Error occurred while executing command to retrieve plaintext diff as file is not UTF-8.")
+            raise tornado.web.HTTPError(
+                log_message="Error occurred while executing command to retrieve plaintext diff as file is not UTF-8."
+            )
 
         prev_content = await self.show(filename, prev_ref["git"], top_repo_path)
         if "special" in curr_ref:
@@ -1043,17 +1069,23 @@ class Git:
             elif curr_ref["special"] == "INDEX":
                 is_binary = await self._is_binary(filename, "INDEX", top_repo_path)
                 if is_binary:
-                    raise tornado.web.HTTPError(log_message="Error occurred while executing command to retrieve plaintext diff as file is not UTF-8.")
+                    raise tornado.web.HTTPError(
+                        log_message="Error occurred while executing command to retrieve plaintext diff as file is not UTF-8."
+                    )
 
                 curr_content = await self.show(filename, "", top_repo_path)
             else:
                 raise tornado.web.HTTPError(
-                    log_message="Error while retrieving plaintext diff, unknown special ref '{}'.".format(curr_ref["special"])
+                    log_message="Error while retrieving plaintext diff, unknown special ref '{}'.".format(
+                        curr_ref["special"]
+                    )
                 )
         else:
             is_binary = await self._is_binary(filename, curr_ref["git"], top_repo_path)
             if is_binary:
-                raise tornado.web.HTTPError(log_message="Error occurred while executing command to retrieve plaintext diff as file is not UTF-8.")
+                raise tornado.web.HTTPError(
+                    log_message="Error occurred while executing command to retrieve plaintext diff as file is not UTF-8."
+                )
 
             curr_content = await self.show(filename, curr_ref["git"], top_repo_path)
 
@@ -1081,20 +1113,42 @@ class Git:
             HTTPError: if git command failed
         """
         if ref == "INDEX":
-            command = ["git", "diff", "--numstat", "--cached", "4b825dc642cb6eb9a060e54bf8d69288fbee4904", "--", filename]
+            command = [
+                "git",
+                "diff",
+                "--numstat",
+                "--cached",
+                "4b825dc642cb6eb9a060e54bf8d69288fbee4904",
+                "--",
+                filename,
+            ]
         else:
-            command = ["git", "diff", "--numstat", "4b825dc642cb6eb9a060e54bf8d69288fbee4904", ref, "--", filename]  # where 4b825... is a magic SHA which represents the empty tree
+            command = [
+                "git",
+                "diff",
+                "--numstat",
+                "4b825dc642cb6eb9a060e54bf8d69288fbee4904",
+                ref,
+                "--",
+                filename,
+            ]  # where 4b825... is a magic SHA which represents the empty tree
         code, output, error = await execute(command, cwd=top_repo_path)
 
         if code != 0:
-            err_msg = "fatal: Path '{}' does not exist (neither on disk nor in the index)".format(filename).lower()
+            err_msg = "fatal: Path '{}' does not exist (neither on disk nor in the index)".format(
+                filename
+            ).lower()
             if err_msg in error.lower():
                 return False
 
-            raise tornado.web.HTTPError(log_message="Error while determining if file is binary or text '{}'.".format(error))
+            raise tornado.web.HTTPError(
+                log_message="Error while determining if file is binary or text '{}'.".format(
+                    error
+                )
+            )
 
         # For binary files, `--numstat` outputs two `-` characters separated by TABs:
-        return output.startswith('-\t-\t')
+        return output.startswith("-\t-\t")
 
     def remote_add(self, top_repo_path, url, name=DEFAULT_REMOTE_NAME):
         """Handle call to `git remote add` command.
@@ -1107,16 +1161,15 @@ class Git:
             Remote name; default "origin"
         """
         cmd = ["git", "remote", "add", name, url]
-        p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=top_repo_path)
+        p = subprocess.Popen(
+            cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=top_repo_path
+        )
         _, my_error = p.communicate()
         if p.returncode == 0:
-            return {
-                "code": p.returncode,
-                "command": " ".join(cmd)
-            }
+            return {"code": p.returncode, "command": " ".join(cmd)}
         else:
             return {
                 "code": p.returncode,
                 "command": " ".join(cmd),
-                "message": my_error.decode("utf-8").strip()
+                "message": my_error.decode("utf-8").strip(),
             }

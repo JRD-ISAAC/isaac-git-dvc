@@ -19,6 +19,7 @@ export namespace CommandIDs {
   export const gitUI = 'git:ui';
   export const gitTerminalCommand = 'git:terminal-command';
   export const gitInit = 'git:init';
+  export const dvcInit = 'dvc:init';
   export const gitOpenUrl = 'git:open-url';
   export const gitToggleSimpleStaging = 'git:toggle-simple-staging';
   export const gitAddRemote = 'git:add-remote';
@@ -92,6 +93,25 @@ export function addCommands(
 
       if (result.button.accept) {
         await model.init(currentPath);
+        model.pathRepository = currentPath;
+      }
+    }
+  });
+
+  /** Add dvc init command */
+  commands.addCommand(CommandIDs.dvcInit, {
+    label: 'DVC Init',
+    caption: ' Initialize DVC repositor',
+    execute: async () => {
+      const currentPath = fileBrowser.model.path;
+      const result = await showDialog({
+        title: 'Initialize a DVC Repository',
+        body: 'Do you really want to make this directory a DVC Repo?',
+        buttons: [Dialog.cancelButton(), Dialog.warnButton({ label: 'Yes' })]
+      });
+
+      if (result.button.accept) {
+        await model.dvc_init(currentPath);
         model.pathRepository = currentPath;
       }
     }
