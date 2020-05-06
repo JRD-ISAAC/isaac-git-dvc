@@ -876,7 +876,7 @@ class Git:
         if auth:
             env["GIT_TERMINAL_PROMPT"] = "1"
             code, _, error = await execute(
-                ["git", "push", remote, branch],
+                ["git", "push", "--set-upstream", remote, branch],
                 username=auth["username"],
                 password=auth["password"],
                 cwd=os.path.join(self.root_dir, curr_fb_path),
@@ -885,7 +885,7 @@ class Git:
         else:
             env["GIT_TERMINAL_PROMPT"] = "0"
             code, _, error = await execute(
-                ["git", "push", remote, branch],
+                ["git", "push", "--set-upstream", remote, branch],
                 env=env,
                 cwd=os.path.join(self.root_dir, curr_fb_path),
             )
