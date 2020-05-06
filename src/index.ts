@@ -116,6 +116,11 @@ async function activate(
       createGitMenu(app, gitExtension, factory.defaultBrowser, settings),
       { rank: 60 }
     );
+
+    mainMenu.addMenu(
+      createDvcMenu(app, gitExtension, factory.defaultBrowser, settings),
+      { rank: 70 }
+    );
   }
   // Add a clone button to the file browser extension toolbar
   addCloneButton(gitExtension, factory.defaultBrowser);
@@ -141,7 +146,6 @@ function createGitMenu(
     CommandIDs.gitUI,
     CommandIDs.gitTerminalCommand,
     CommandIDs.gitInit,
-    CommandIDs.dvcInit,
     CommandIDs.gitClone,
     CommandIDs.gitAddRemote
   ].forEach(command => {
@@ -161,6 +165,27 @@ function createGitMenu(
   menu.addItem({ type: 'separator' });
 
   menu.addItem({ command: CommandIDs.gitToggleSimpleStaging });
+
+  return menu;
+}
+
+/**
+ * Add DVC commands and menu items
+ */
+function createDvcMenu(
+  app: JupyterFrontEnd,
+  gitExtension: IGitExtension,
+  fileBrowser: FileBrowser,
+  settings: ISettingRegistry.ISettings
+): Menu {
+  const { commands } = app;
+  // addCommands(app, gitExtension, fileBrowser, settings);
+
+  const menu = new Menu({ commands });
+  menu.title.label = 'DVC';
+  [CommandIDs.dvcInit].forEach(command => {
+    menu.addItem({ command });
+  });
 
   return menu;
 }
