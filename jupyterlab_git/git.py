@@ -247,6 +247,11 @@ class Git:
         :return: response with status code and error message.
         """
         env = os.environ.copy()
+        if not repo_url.startswith("http"):
+            return {
+                "code": -1,
+                "message": "SSH URLs are currently not supported. Please enter valid HTTPS repo URL."
+            }
         if auth:
             env["GIT_TERMINAL_PROMPT"] = "1"
             code, _, error = await execute(
