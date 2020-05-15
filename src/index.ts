@@ -110,6 +110,10 @@ async function activate(
     // Rank has been chosen somewhat arbitrarily to give priority to the running
     // sessions widget in the sidebar.
     app.shell.add(gitPlugin, 'left', { rank: 200 });
+    app.contextMenu.addItem({
+      command: CommandIDs.dvcFileAdd,
+      selector: '.jp-DirListing-item'
+    });
 
     // Add a menu for the plugin
     mainMenu.addMenu(

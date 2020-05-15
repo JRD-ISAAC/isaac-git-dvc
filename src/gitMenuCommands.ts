@@ -20,6 +20,7 @@ export namespace CommandIDs {
   export const gitTerminalCommand = 'git:terminal-command';
   export const gitInit = 'git:init';
   export const dvcInit = 'dvc:init';
+  export const dvcFileAdd = 'dvc:filebrowser-add';
   export const gitOpenUrl = 'git:open-url';
   export const gitToggleSimpleStaging = 'git:toggle-simple-staging';
   export const gitAddRemote = 'git:add-remote';
@@ -79,6 +80,27 @@ export function addCommands(
     }
   });
 
+  commands.addCommand(CommandIDs.dvcFileAdd, {
+    label: 'DVC Add',
+    caption: 'Start tracking selected file with DVC',
+    execute: async () => {
+      const splitRepoPath = model.pathRepository.split('/');
+      const repoName = splitRepoPath[splitRepoPath.length - 1];
+      const filepaths = [];
+      const itemIterator = fileBrowser.selectedItems();
+      let item = itemIterator.next();
+      while (item) {
+        const relativePathBegin = item.path.indexOf(repoName) + repoName.length;
+        const path =
+          '.' + item.path.substr(relativePathBegin, item.path.length);
+        filepaths.push(path);
+        item = itemIterator.next();
+      }
+      await model.dvc_add(...filepaths);
+      // this.dvcAddFile(this.state.selectedFile.to);
+    }
+  });
+
   /** Add git init command */
   commands.addCommand(CommandIDs.gitInit, {
     label: 'Init',
@@ -112,7 +134,7 @@ export function addCommands(
 
       if (result.button.accept) {
         await model.dvc_init(currentPath);
-        model.pathRepository = currentPath;
+        // model.pathRepository = currentPath;
       }
     }
   });
