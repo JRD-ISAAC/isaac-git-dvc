@@ -10,6 +10,8 @@ import {
   openMenuIconClass,
   pullButtonClass,
   pushButtonClass,
+  dvcPushButtonClass,
+  dvcPullButtonClass,
   refreshButtonClass,
   repoIconClass,
   toolbarButtonClass,
@@ -190,16 +192,29 @@ export class Toolbar extends React.Component<IToolbarProps, IToolbarState> {
         <button
           className={classes(
             toolbarButtonClass,
+            dvcPullButtonClass,
+            'jp-Icon-16'
+          )}
+          title={'Pull DVC files'}
+          onClick={this._onDvcPushClick}
+        />
+        <button
+          className={classes(
+            toolbarButtonClass,
+            dvcPushButtonClass,
+            'jp-Icon-16'
+          )}
+          title={'Push DVC files'}
+          onClick={this._onDvcPushClick}
+        />
+        <button
+          className={classes(
+            toolbarButtonClass,
             refreshButtonClass,
             'jp-Icon-16'
           )}
           title={'Refresh the repository to detect local and remote changes'}
           onClick={this._onRefreshClick}
-        />
-        <button
-          className={classes(toolbarButtonClass, pushButtonClass, 'jp-Icon-16')}
-          title={'Push DVC files'}
-          onClick={this._onDvcPushClick}
         />
       </div>
     );

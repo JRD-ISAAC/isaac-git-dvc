@@ -128,6 +128,22 @@ export const pushButtonClass = style({
   backgroundPosition: 'center'
 });
 
+export const dvcPushButtonClass = style({
+  background: 'var(--jp-layout-color1)',
+  backgroundImage: 'var(--jp-icon-dvc-push)',
+  backgroundSize: '16px',
+  backgroundRepeat: 'no-repeat',
+  backgroundPosition: 'center'
+});
+
+export const dvcPullButtonClass = style({
+  background: 'var(--jp-layout-color1)',
+  backgroundImage: 'var(--jp-icon-dvc-pull)',
+  backgroundSize: '16px',
+  backgroundRepeat: 'no-repeat',
+  backgroundPosition: 'center'
+});
+
 export const refreshButtonClass = style({
   marginRight: '4px',
 

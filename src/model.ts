@@ -877,6 +877,36 @@ export class GitExtension implements IGitExtension {
     }
   }
 
+  /** Make request for the DVC Push API. */
+  async dvcPull(auth?: Git.IAuth): Promise<Git.IPushPullResult> {
+    await this.ready;
+    const path = this.pathRepository;
+
+    if (path === null) {
+      return Promise.resolve({
+        code: -1,
+        message: 'Not in a git repository.'
+      });
+    }
+
+    try {
+      const obj: Git.IPushPull = {
+        current_path: path,
+        auth
+      };
+
+      const response = await httpGitRequest('/dvc/pull', 'POST', obj);
+      if (response.status !== 200) {
+        const data = await response.json();
+        throw new ServerConnection.ResponseError(response, data.message);
+      }
+      this._headChanged.emit();
+      return response.json();
+    } catch (err) {
+      throw new ServerConnection.NetworkError(err);
+    }
+  }
+
   /**
    * General Git refresh
    */

@@ -233,6 +233,14 @@ export interface IGitExtension extends IDisposable {
   dvcPush(auth?: Git.IAuth): Promise<Git.IPushPullResult>;
 
   /**
+   * Make request for the DVC Pull API.
+   *
+   * @param auth Optional authentication information for the remote repository
+   * @returns Command execution status
+   */
+  dvcPull(auth?: Git.IAuth): Promise<Git.IPushPullResult>;
+
+  /**
    * General git refresh
    */
   refresh(): Promise<void>;

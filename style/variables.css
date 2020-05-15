@@ -18,6 +18,8 @@
   --jp-icon-git-pull: url('./images/git-pull.svg');
   --jp-icon-git-push: url('./images/git-push.svg');
   --jp-icon-git-repo: url('./images/desktop.svg');
+  --jp-icon-dvc-push: url('./images/dvc-push.svg');
+  --jp-icon-dvc-pull: url('./images/dvc-pull.svg');
 }
 
 [data-jp-theme-light='false'] {
@@ -26,4 +28,6 @@
   --jp-icon-git-pull: url('./images/git-pull-white.svg');
   --jp-icon-git-push: url('./images/git-push-white.svg');
   --jp-icon-git-repo: url('./images/desktop-white.svg');
+  --jp-icon-dvc-push: url('./images/dvc-push.svg');
+  --jp-icon-dvc-pull: url('./images/dvc-pull.svg');
 }

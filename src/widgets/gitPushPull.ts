@@ -6,7 +6,8 @@ import { Git, IGitExtension } from '../tokens';
 export enum Operation {
   Pull = 'Pull',
   Push = 'Push',
-  DvcPush = 'DvcPush'
+  DvcPush = 'DvcPush',
+  DvcPull = 'DvcPull'
 }
 
 /**
@@ -60,6 +61,14 @@ export class GitPullPushDialog extends Widget {
       case Operation.DvcPush:
         this._model
           .dvcPush(auth)
+          .then(response => {
+            this.handleResponse(response);
+          })
+          .catch(() => this.handleError());
+        break;
+      case Operation.DvcPull:
+        this._model
+          .dvcPull(auth)
           .then(response => {
             this.handleResponse(response);
           })
