@@ -82,6 +82,7 @@ export function addCommands(
 
   commands.addCommand(CommandIDs.dvcFileAdd, {
     label: 'DVC Add',
+    iconClass: 'jp-MaterialIcon jp-AddIcon',
     caption: 'Start tracking selected file with DVC',
     execute: async () => {
       const splitRepoPath = model.pathRepository.split('/');

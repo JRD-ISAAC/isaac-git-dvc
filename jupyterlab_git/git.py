@@ -899,12 +899,29 @@ class Git:
 
     async def dvc_push(self, curr_fb_path):
         """
-        Execute `git push $UPSTREAM $BRANCH`. The choice of upstream and branch is up to the caller.
+        Execute `dvc push`.
         """
         env = os.environ.copy()
         env["GIT_TERMINAL_PROMPT"] = "1"
         code, _, error = await execute(
             ["dvc", "push"], cwd=os.path.join(self.root_dir, curr_fb_path), env=env,
+        )
+
+        response = {"code": code}
+
+        if code != 0:
+            response["message"] = error.strip()
+
+        return response
+    
+    async def dvc_pull(self, curr_fb_path):
+        """
+        Execute `dvc pull`.
+        """
+        env = os.environ.copy()
+        env["GIT_TERMINAL_PROMPT"] = "1"
+        code, _, error = await execute(
+            ["dvc", "pull"], cwd=os.path.join(self.root_dir, curr_fb_path), env=env,
         )
 
         response = {"code": code}

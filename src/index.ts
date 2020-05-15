@@ -147,10 +147,10 @@ function createGitMenu(
   const menu = new Menu({ commands });
   menu.title.label = 'Git';
   [
+    CommandIDs.gitClone,
+    CommandIDs.gitInit,
     CommandIDs.gitUI,
     CommandIDs.gitTerminalCommand,
-    CommandIDs.gitInit,
-    CommandIDs.gitClone,
     CommandIDs.gitAddRemote
   ].forEach(command => {
     menu.addItem({ command });
