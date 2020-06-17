@@ -125,6 +125,11 @@ async function activate(
       createDvcMenu(app, gitExtension, factory.defaultBrowser, settings),
       { rank: 70 }
     );
+
+    mainMenu.addMenu(
+      createHackathonMenu(app, gitExtension, factory.defaultBrowser, settings),
+      { rank: 80 }
+    );
   }
   // Add a clone button to the file browser extension toolbar
   addCloneButton(gitExtension, factory.defaultBrowser);
@@ -190,6 +195,26 @@ function createDvcMenu(
   [CommandIDs.dvcInit].forEach(command => {
     menu.addItem({ command });
   });
+
+  return menu;
+}
+
+/**
+ * Add JNJ Hackathon commands and menu items
+ */
+function createHackathonMenu(
+  app: JupyterFrontEnd,
+  gitExtension: IGitExtension,
+  fileBrowser: FileBrowser,
+  settings: ISettingRegistry.ISettings
+): Menu {
+  const { commands } = app;
+
+  const menu = new Menu({ commands });
+  menu.title.label = 'Hackathon';
+  // [CommandIDs.dvcInit].forEach(command => {
+  //   menu.addItem({ command });
+  // });
 
   return menu;
 }
