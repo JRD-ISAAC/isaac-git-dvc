@@ -211,7 +211,7 @@ function createHackathonMenu(
   const { commands } = app;
 
   const menu = new Menu({ commands });
-  menu.title.label = 'Hackathon';
+  menu.title.label = 'JNJ Hackathon';
   [CommandIDs.hackathonSubmitResults].forEach(command => {
     menu.addItem({ command });
   });
