@@ -25,6 +25,7 @@ export namespace CommandIDs {
   export const gitToggleSimpleStaging = 'git:toggle-simple-staging';
   export const gitAddRemote = 'git:add-remote';
   export const gitClone = 'git:clone';
+  export const hackathonSubmitResults = 'hackathon:submit-results';
 }
 
 /**
@@ -137,6 +138,15 @@ export function addCommands(
         await model.dvc_init(currentPath);
         // model.pathRepository = currentPath;
       }
+    }
+  });
+
+  /** Add dvc init command */
+  commands.addCommand(CommandIDs.hackathonSubmitResults, {
+    label: 'Submit Results',
+    caption: ' Submit hackathon results',
+    execute: async () => {
+      // TODO
     }
   });
 

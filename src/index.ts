@@ -212,9 +212,9 @@ function createHackathonMenu(
 
   const menu = new Menu({ commands });
   menu.title.label = 'Hackathon';
-  // [CommandIDs.dvcInit].forEach(command => {
-  //   menu.addItem({ command });
-  // });
+  [CommandIDs.hackathonSubmitResults].forEach(command => {
+    menu.addItem({ command });
+  });
 
   return menu;
 }
