@@ -119,3 +119,4 @@ node_modules/
 *.code-workspace
 .history
 .vscode
+config.py

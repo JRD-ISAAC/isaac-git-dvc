@@ -12,7 +12,8 @@ from notebook.utils import url2path
 from notebook.utils import url_path_join as ujoin
 
 from .git import DEFAULT_REMOTE_NAME
-
+import logging
+logger = logging.getLogger(__name__)
 
 class GitHandler(APIHandler):
     """
@@ -247,6 +248,29 @@ class DvcAddHandler(GitHandler):
         else:
             filename = data["filename"]
             body = await self.git.dvc_add(filename, top_repo_path)
+
+        if body["code"] != 0:
+            self.set_status(500)
+        self.finish(json.dumps(body))
+
+
+class SeldonDeployHandler(GitHandler):
+    """
+    Handler for deploying model to seldon.
+    """
+
+    @web.authenticated
+    async def post(self):
+        """
+        POST request handler, dvc add.
+        """
+        data = self.get_json_body()
+        top_repo_path = data["top_repo_path"]
+        logger.info(data)
+        filename = data["filename"]
+        filepath = data["filepath"]
+        seldon_detail = data["seldon_detail"]
+        body = await self.git.seldon_deploy(filename, filepath, top_repo_path, seldon_detail)
 
         if body["code"] != 0:
             self.set_status(500)
@@ -666,6 +690,7 @@ def setup_handlers(web_app):
         ("/git/status", GitStatusHandler),
         ("/git/upstream", GitUpstreamHandler),
         ("/dvc/add", DvcAddHandler),
+        ("/seldon/deploy", SeldonDeployHandler),
     ]
 
     # add the baseurl to our paths

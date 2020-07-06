@@ -7,10 +7,14 @@ import re
 import subprocess
 from urllib.parse import unquote
 from uuid import uuid4
+import requests
 
 import pexpect
 import tornado
 import tornado.locks
+import boto3
+from .config import Config
+from pathlib import Path
 
 # Git configuration options exposed through the REST API
 ALLOWED_OPTIONS = ["user.name", "user.email"]
@@ -658,6 +662,35 @@ class Git:
         if code != 0:
             return {"code": code, "command": " ".join(cmd), "message": error}
         return {"code": code}
+
+    
+    async def seldon_deploy(self, filename, filepath, top_repo_path, seldon_detail):
+        """
+        Execute dvc add<filename> command & return the result.
+        """
+        env = os.environ.copy()
+        model_name = seldon_detail["model_name"]
+        implementation = seldon_detail["implementation"]
+        model_key = model_name + "/"
+        model_uri = f"s3://{Config.AWS_BUCKET_NAME}/{model_key}"
+        cmd = ["aws", "--profile", "seldon", "s3", "cp", filepath, model_uri + filename, "--sse", "aws:kms"]
+        code, _, error = await execute(cmd, cwd=top_repo_path, env=env)
+
+        if code != 0:
+            return {"code": code, "command": " ".join(cmd), "message": error}
+        
+        payload = {
+            "model_name": model_name,
+            "implementation": implementation,
+            "model_uri": model_uri,
+        }
+        response = requests.post(Config.SELDON_API_URL, data=payload)
+
+        if response.ok:
+            return {"code": 0, "results": response.json()}
+        
+        return {"code": response.status_code, "command": " ".join(cmd), "message": response.text}
+    
 
     async def add_all_unstaged(self, top_repo_path):
         """
