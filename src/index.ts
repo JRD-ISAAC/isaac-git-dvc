@@ -114,6 +114,10 @@ async function activate(
       command: CommandIDs.dvcFileAdd,
       selector: '.jp-DirListing-item'
     });
+    app.contextMenu.addItem({
+      command: CommandIDs.seldonModelDeploy,
+      selector: '.jp-DirListing-item'
+    });
 
     // Add a menu for the plugin
     mainMenu.addMenu(

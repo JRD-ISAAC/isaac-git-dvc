@@ -68,6 +68,12 @@ export interface IGitExtension extends IDisposable {
 
   dvc_add(...filename: string[]): Promise<Response>;
 
+  seldon_deploy(
+    filename: string,
+    filepath: string,
+    seldon_detail: Git.ISeldonDetail
+  ): Promise<Response>;
+
   /**
    * Make request to add all unstaged files into
    * the staging area in repository 'path'
@@ -469,6 +475,14 @@ export namespace Git {
   export interface IAuth {
     username: string;
     password: string;
+  }
+
+  /**
+   * Interface for the seldon deploy request.
+   */
+  export interface ISeldonDetail {
+    model_name: string;
+    implementation: string;
   }
 
   /**

@@ -11,6 +11,7 @@ import { ISettingRegistry } from '@jupyterlab/settingregistry';
 import { ITerminal } from '@jupyterlab/terminal';
 import { IGitExtension } from './tokens';
 import { doGitClone } from './widgets/gitClone';
+import { SeldonDetailForm } from './widgets/SeldonDetailBox';
 
 /**
  * The command IDs used by the git plugin.
@@ -21,6 +22,7 @@ export namespace CommandIDs {
   export const gitInit = 'git:init';
   export const dvcInit = 'dvc:init';
   export const dvcFileAdd = 'dvc:filebrowser-add';
+  export const seldonModelDeploy = 'seldon:model-deploy';
   export const gitOpenUrl = 'git:open-url';
   export const gitToggleSimpleStaging = 'git:toggle-simple-staging';
   export const gitAddRemote = 'git:add-remote';
@@ -99,6 +101,41 @@ export function addCommands(
       }
       await model.dvc_add(...filepaths);
       // this.dvcAddFile(this.state.selectedFile.to);
+    }
+  });
+
+  commands.addCommand(CommandIDs.seldonModelDeploy, {
+    label: 'Deploy To Seldon',
+    iconClass: 'jp-MaterialIcon jp-AddIcon',
+    caption: 'Deploy the model file to seldon.',
+    execute: async () => {
+      const splitRepoPath = model.pathRepository.split('/');
+      const repoName = splitRepoPath[splitRepoPath.length - 1];
+      const itemIterator = fileBrowser.selectedItems();
+      const item = itemIterator.next();
+
+      const relativePathBegin = item.path.indexOf(repoName) + repoName.length;
+      const path = '.' + item.path.substr(relativePathBegin, item.path.length);
+
+      const result = await showDialog({
+        title: 'Provide seldon model details: ',
+        body: new SeldonDetailForm()
+      });
+
+      if (!result.button.accept) {
+        console.log('User refuses to fill details.');
+        return;
+      }
+
+      const seldonDetail = result.value;
+      const res = await model.seldon_deploy(item.name, path, {
+        model_name: seldonDetail.model_name,
+        implementation: seldonDetail.implementation
+      });
+      if (!res.ok) {
+        console.log(await res.text());
+        return false;
+      }
     }
   });
 

@@ -261,6 +261,36 @@ export class GitExtension implements IGitExtension {
     return Promise.resolve(response);
   }
 
+  async seldon_deploy(
+    filename: string,
+    filepath: string,
+    seldon_detail: Git.ISeldonDetail
+  ): Promise<Response> {
+    await this.ready;
+    const path = this.pathRepository;
+
+    if (path === null) {
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            code: -1,
+            message: 'Not in a git repository.'
+          })
+        )
+      );
+    }
+
+    const response = await httpGitRequest('/seldon/deploy', 'POST', {
+      filename: filename || '',
+      filepath: filepath || '',
+      top_repo_path: path,
+      seldon_detail: seldon_detail
+    });
+
+    this.refreshStatus();
+    return Promise.resolve(response);
+  }
+
   /**
    * Make request to add all unstaged files into
    * the staging area in repository 'path'
