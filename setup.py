@@ -72,7 +72,8 @@ setup_args = dict(
     install_requires = [
         'notebook',
         'nbdime ~=2.0',
-        'pexpect'
+        'pexpect',
+        'boto3'
     ],
     extras_require = {
         'test': [
