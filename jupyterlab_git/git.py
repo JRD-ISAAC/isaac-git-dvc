@@ -16,6 +16,11 @@ import boto3
 from .config import Config
 from pathlib import Path
 
+import logging
+
+logger = logging.getLogger(__name__)
+
+conf = Config()
 # Git configuration options exposed through the REST API
 ALLOWED_OPTIONS = ["user.name", "user.email"]
 # Regex pattern to capture (key, value) of Git configuration options.
@@ -671,25 +676,33 @@ class Git:
         env = os.environ.copy()
         model_name = seldon_detail["model_name"]
         implementation = seldon_detail["implementation"]
-        model_key = model_name + "/"
-        model_uri = f"s3://{Config.AWS_BUCKET_NAME}/{model_key}"
-        cmd = ["aws", "--profile", "seldon", "s3", "cp", filepath, model_uri + filename, "--sse", "aws:kms"]
-        code, _, error = await execute(cmd, cwd=top_repo_path, env=env)
+        model_uri = f"s3://{conf.AWS_BUCKET_NAME}/{model_name}/"
+        # cmd = ["aws", "--profile", "seldon", "s3", "cp", filepath, model_uri + filename, "--sse", "aws:kms"]
+        # code, _, error = await execute(cmd, cwd=top_repo_path, env=env)
 
-        if code != 0:
-            return {"code": code, "command": " ".join(cmd), "message": error}
-        
+        # if code != 0:
+        #     return {"code": code, "command": " ".join(cmd), "message": error}
+        absolute_path = Path(top_repo_path) / filepath
+        s3 = boto3.resource("s3", aws_access_key_id=conf.AWS_ACCESS_KEY_ID, aws_secret_access_key=conf.AWS_SECRET_ACCESS_KEY)
+        bucket = s3.Bucket(conf.AWS_BUCKET_NAME)
+        try:
+            bucket.upload_file(Filename=str(absolute_path), Key=f"{model_name}/{filename}", ExtraArgs={"ServerSideEncryption": "aws:kms"})
+        except Exception as error:
+            error_message = str(error)
+            logger.error(error_message)
+            return {"code": 500, "results": error_message}
+
         payload = {
             "model_name": model_name,
             "implementation": implementation,
             "model_uri": model_uri,
         }
-        response = requests.post(Config.SELDON_API_URL, data=payload)
+        response = requests.post(conf.SELDON_API_URL, data=payload)
 
         if response.ok:
             return {"code": 0, "results": response.json()}
         
-        return {"code": response.status_code, "command": " ".join(cmd), "message": response.text}
+        return {"code": response.status_code, "message": response.text}
     
 
     async def add_all_unstaged(self, top_repo_path):
