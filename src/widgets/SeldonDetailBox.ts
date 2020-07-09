@@ -25,14 +25,24 @@ export class SeldonDetailForm extends Widget
     const option1 = document.createElement('option');
     option1.value = 'SKLEARN_SERVER';
     option1.selected = true;
-    option1.innerHTML = 'Scikit-learn';
+    option1.innerHTML = 'Scikit-learn Server';
 
     const option2 = document.createElement('option');
     option2.value = 'TENSORFLOW_SERVER';
-    option2.innerHTML = 'Tensorflow';
+    option2.innerHTML = 'Tensorflow Server';
+
+    const option3 = document.createElement('option');
+    option3.value = 'MLFLOW_SERVER';
+    option3.innerHTML = 'MLflow Server';
+
+    const option4 = document.createElement('option');
+    option4.value = 'XGBOOST_SERVER';
+    option4.innerHTML = 'XGBoost Server';
 
     this._implementation.appendChild(option1);
     this._implementation.appendChild(option2);
+    this._implementation.appendChild(option3);
+    this._implementation.appendChild(option4);
 
     node.appendChild(text);
     node.appendChild(this._model_name);
