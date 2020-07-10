@@ -15,6 +15,7 @@ import tornado.locks
 import boto3
 from .config import Config
 from pathlib import Path
+import yaml, json
 
 import logging
 
@@ -1013,6 +1014,40 @@ class Git:
         if code != 0:
             return {"code": code, "command": " ".join(cmd), "message": error}
         return {"code": code}
+    
+    async def argo_send(self, current_path):
+        """
+        send the workflow file to argo.
+        """
+        with open(Path(current_path) / 'workflow.yaml', 'r') as f:
+            workflow = yaml.safe_load(f)
+
+        REQUEST_URL = 'http://argo-isaac.apps.jnj.com/api/v1/workflows/default'
+
+        data = {}
+
+        parameters = workflow['spec']['arguments']['parameters']
+
+        if len(parameters) > 0 and parameters[0]['name'] == 'repo':
+            code, _, repo_url  = await execute(["git", "config", '--get', 'remote.origin.url'], cwd=os.path.join(self.root_dir, current_path))
+            logger.info(repo_url)
+            repo_url = repo_url.strip()
+            parameters[0]['value'] = repo_url
+
+        print(parameters)
+
+        data['workflow'] = workflow
+
+        try:
+            response = requests.post(REQUEST_URL, json=data)
+            print(response.status_code, response.reason)
+        except Exception as error:
+            return {"code": -1, "message": error}
+        
+        if response.ok:
+            return { "code": response.status_code, "message": response.json() }
+        
+        return { "code": response.status_code, "message": response.text }
 
     def _is_remote_branch(self, branch_reference):
         """Check if given branch is remote branch by comparing with 'remotes/',

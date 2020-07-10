@@ -193,6 +193,10 @@ export function addCommands(
       if (result.button.accept) {
         await model.send_workflow(currentPath);
         // model.pathRepository = currentPath;
+        await showDialog({
+          title: 'Done',
+          body: 'Your workflow has been submitted successfully'
+        });
       }
     }
   });

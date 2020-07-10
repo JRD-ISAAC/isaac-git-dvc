@@ -73,7 +73,8 @@ setup_args = dict(
         'notebook',
         'nbdime ~=2.0',
         'pexpect',
-        'boto3'
+        'boto3',
+        'pyyaml',
     ],
     extras_require = {
         'test': [

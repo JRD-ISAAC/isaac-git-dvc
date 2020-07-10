@@ -777,7 +777,7 @@ export class GitExtension implements IGitExtension {
   async send_workflow(path: string): Promise<Response> {
     try {
       const response = await httpGitRequest('/argo/send', 'POST', {
-        current_path: path
+        current_path: this.pathRepository
       });
       if (response.status !== 200) {
         return response.json().then((data: any) => {

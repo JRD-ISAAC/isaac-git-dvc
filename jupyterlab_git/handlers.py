@@ -595,6 +595,25 @@ class DvcInitHandler(GitHandler):
         self.finish(json.dumps(body))
 
 
+class ArgoSendHandler(GitHandler):
+    """
+    Handler for 'git init'. Initializes a repository.
+    """
+
+    @web.authenticated
+    async def post(self):
+        """
+        POST request handler, initializes a repository.
+        """
+        current_path = self.get_json_body()["current_path"]
+        body = await self.git.argo_send(current_path)
+
+        if body["code"] != 0:
+            self.set_status(500)
+
+        self.finish(json.dumps(body))
+
+
 class GitChangedFilesHandler(GitHandler):
     @web.authenticated
     async def post(self):
@@ -691,6 +710,7 @@ def setup_handlers(web_app):
         ("/git/upstream", GitUpstreamHandler),
         ("/dvc/add", DvcAddHandler),
         ("/seldon/deploy", SeldonDeployHandler),
+        ("/argo/send", ArgoSendHandler),
     ]
 
     # add the baseurl to our paths
