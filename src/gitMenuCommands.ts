@@ -21,6 +21,7 @@ export namespace CommandIDs {
   export const gitTerminalCommand = 'git:terminal-command';
   export const gitInit = 'git:init';
   export const dvcInit = 'dvc:init';
+  export const argoDeploy = 'argo:deploy';
   export const dvcFileAdd = 'dvc:filebrowser-add';
   export const seldonModelDeploy = 'seldon:model-deploy';
   export const gitOpenUrl = 'git:open-url';
@@ -172,6 +173,25 @@ export function addCommands(
 
       if (result.button.accept) {
         await model.dvc_init(currentPath);
+        // model.pathRepository = currentPath;
+      }
+    }
+  });
+
+  /** Add dvc init command */
+  commands.addCommand(CommandIDs.argoDeploy, {
+    label: 'Send workflow',
+    caption: 'Send and run workflow in Argo',
+    execute: async () => {
+      const currentPath = fileBrowser.model.path;
+      const result = await showDialog({
+        title: 'Send and run workflow in Argo',
+        body: 'Do you really want to send this workflow to argo?',
+        buttons: [Dialog.cancelButton(), Dialog.warnButton({ label: 'Yes' })]
+      });
+
+      if (result.button.accept) {
+        await model.send_workflow(currentPath);
         // model.pathRepository = currentPath;
       }
     }

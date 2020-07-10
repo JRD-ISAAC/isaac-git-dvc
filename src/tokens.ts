@@ -207,6 +207,13 @@ export interface IGitExtension extends IDisposable {
   dvc_init(path: string): Promise<Response>;
 
   /**
+   * Make request to send workflow.yaml to argo at path 'path'
+   *
+   * @param path Folder path where workflow file is present.
+   */
+  send_workflow(path: string): Promise<Response>;
+
+  /**
    * Make request for git commit logs
    *
    * @param historyCount: Optional number of commits to get from git log

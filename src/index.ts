@@ -129,6 +129,11 @@ async function activate(
       createDvcMenu(app, gitExtension, factory.defaultBrowser, settings),
       { rank: 70 }
     );
+
+    mainMenu.addMenu(
+      createArgoMenu(app, gitExtension, factory.defaultBrowser, settings),
+      { rank: 80 }
+    );
   }
   // Add a clone button to the file browser extension toolbar
   addCloneButton(gitExtension, factory.defaultBrowser);
@@ -192,6 +197,27 @@ function createDvcMenu(
   const menu = new Menu({ commands });
   menu.title.label = 'DVC';
   [CommandIDs.dvcInit].forEach(command => {
+    menu.addItem({ command });
+  });
+
+  return menu;
+}
+
+/**
+ * Add Argo commands and menu items
+ */
+function createArgoMenu(
+  app: JupyterFrontEnd,
+  gitExtension: IGitExtension,
+  fileBrowser: FileBrowser,
+  settings: ISettingRegistry.ISettings
+): Menu {
+  const { commands } = app;
+  // addCommands(app, gitExtension, fileBrowser, settings);
+
+  const menu = new Menu({ commands });
+  menu.title.label = 'Argo';
+  [CommandIDs.argoDeploy].forEach(command => {
     menu.addItem({ command });
   });
 

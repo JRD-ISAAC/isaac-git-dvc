@@ -770,6 +770,27 @@ export class GitExtension implements IGitExtension {
   }
 
   /**
+   * Make request to send workflow.yaml to argo at path 'path'
+   *
+   * @param path Folder path where workflow file is present.
+   */
+  async send_workflow(path: string): Promise<Response> {
+    try {
+      const response = await httpGitRequest('/argo/send', 'POST', {
+        current_path: path
+      });
+      if (response.status !== 200) {
+        return response.json().then((data: any) => {
+          throw new ServerConnection.ResponseError(response, data.message);
+        });
+      }
+      return response;
+    } catch (err) {
+      throw new ServerConnection.NetworkError(err);
+    }
+  }
+
+  /**
    * Make request for git commit logs
    *
    * @param historyCount: Optional number of commits to get from git log
