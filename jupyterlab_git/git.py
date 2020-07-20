@@ -1022,7 +1022,7 @@ class Git:
         with open(Path(current_path) / 'workflow.yaml', 'r') as f:
             workflow = yaml.safe_load(f)
 
-        REQUEST_URL = 'http://argo-isaac.apps.jnj.com/api/v1/workflows/default'
+        REQUEST_URL = 'http://pipelines.isaac.jnj.com/api/v1/workflows/default'
 
         data = {}
 

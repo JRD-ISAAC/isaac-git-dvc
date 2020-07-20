@@ -216,7 +216,7 @@ function createArgoMenu(
   // addCommands(app, gitExtension, fileBrowser, settings);
 
   const menu = new Menu({ commands });
-  menu.title.label = 'Argo';
+  menu.title.label = 'ISAAC';
   [CommandIDs.argoDeploy].forEach(command => {
     menu.addItem({ command });
   });
