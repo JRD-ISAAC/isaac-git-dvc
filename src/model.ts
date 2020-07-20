@@ -265,29 +265,33 @@ export class GitExtension implements IGitExtension {
     filename: string,
     filepath: string,
     seldon_detail: Git.ISeldonDetail
-  ): Promise<Response> {
+  ): Promise<Git.IPushPullResult> {
     const path = this.pathRepository;
 
     if (path === null) {
-      return Promise.resolve(
-        new Response(
-          JSON.stringify({
-            code: -1,
-            message: 'Not in a git repository.'
-          })
-        )
-      );
+      return Promise.resolve({
+        code: -1,
+        message: 'Not in a git repository.'
+      });
     }
 
-    const response = await httpGitRequest('/seldon/deploy', 'POST', {
-      filename: filename || '',
-      filepath: filepath || '',
-      top_repo_path: path,
-      seldon_detail: seldon_detail
-    });
+    try {
+      const response = await httpGitRequest('/seldon/deploy', 'POST', {
+        filename: filename || '',
+        filepath: filepath || '',
+        top_repo_path: path,
+        seldon_detail: seldon_detail
+      });
 
-    this.refreshStatus();
-    return Promise.resolve(response);
+      this.refreshStatus();
+      if (response.status !== 200) {
+        const data = await response.json();
+        throw new ServerConnection.ResponseError(response, data.message);
+      }
+      return response.json();
+    } catch (err) {
+      throw new ServerConnection.NetworkError(err);
+    }
   }
 
   /**
@@ -773,17 +777,16 @@ export class GitExtension implements IGitExtension {
    *
    * @param path Folder path where workflow file is present.
    */
-  async send_workflow(path: string): Promise<Response> {
+  async send_workflow(path: string): Promise<Git.IPushPullResult> {
     try {
       const response = await httpGitRequest('/argo/send', 'POST', {
         current_path: this.pathRepository
       });
       if (response.status !== 200) {
-        return response.json().then((data: any) => {
-          throw new ServerConnection.ResponseError(response, data.message);
-        });
+        const data = await response.json();
+        throw new ServerConnection.ResponseError(response, data.message);
       }
-      return response;
+      return response.json();
     } catch (err) {
       throw new ServerConnection.NetworkError(err);
     }

@@ -72,7 +72,7 @@ export interface IGitExtension extends IDisposable {
     filename: string,
     filepath: string,
     seldon_detail: Git.ISeldonDetail
-  ): Promise<Response>;
+  ): Promise<Git.IPushPullResult>;
 
   /**
    * Make request to add all unstaged files into
@@ -211,7 +211,7 @@ export interface IGitExtension extends IDisposable {
    *
    * @param path Folder path where workflow file is present.
    */
-  send_workflow(path: string): Promise<Response>;
+  send_workflow(path: string): Promise<Git.IPushPullResult>;
 
   /**
    * Make request for git commit logs

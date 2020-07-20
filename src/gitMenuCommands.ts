@@ -12,6 +12,7 @@ import { ITerminal } from '@jupyterlab/terminal';
 import { IGitExtension } from './tokens';
 import { doGitClone } from './widgets/gitClone';
 import { SeldonDetailForm } from './widgets/SeldonDetailBox';
+import { SendWorkflowDialog, SeldonDeployDialog } from './widgets/isaacWidgets';
 
 /**
  * The command IDs used by the git plugin.
@@ -129,14 +130,15 @@ export function addCommands(
       }
 
       const seldonDetail = result.value;
-      const res = await model.seldon_deploy(item.name, path, {
-        model_name: seldonDetail.model_name,
-        implementation: seldonDetail.implementation
+
+      await showDialog({
+        title: 'Deploy Model',
+        body: new SeldonDeployDialog(model, item.name, path, {
+          model_name: seldonDetail.model_name,
+          implementation: seldonDetail.implementation
+        }),
+        buttons: [Dialog.okButton({ label: 'DISMISS' })]
       });
-      if (!res.ok) {
-        console.log(await res.text());
-        return false;
-      }
     }
   });
 
@@ -191,11 +193,10 @@ export function addCommands(
       });
 
       if (result.button.accept) {
-        await model.send_workflow(currentPath);
-        // model.pathRepository = currentPath;
         await showDialog({
-          title: 'Done',
-          body: 'Your workflow has been submitted successfully'
+          title: 'Send workflow',
+          body: new SendWorkflowDialog(model, currentPath),
+          buttons: [Dialog.okButton({ label: 'DISMISS' })]
         });
       }
     }
