@@ -13,6 +13,7 @@ import { IGitExtension } from './tokens';
 import { doGitClone } from './widgets/gitClone';
 import { SeldonDetailForm } from './widgets/SeldonDetailBox';
 import { SendWorkflowDialog, SeldonDeployDialog } from './widgets/isaacWidgets';
+import { GitPullPushDialog, Operation } from './widgets/gitPushPull';
 
 /**
  * The command IDs used by the git plugin.
@@ -24,6 +25,8 @@ export namespace CommandIDs {
   export const dvcInit = 'dvc:init';
   export const argoDeploy = 'argo:deploy';
   export const dvcFileAdd = 'dvc:filebrowser-add';
+  export const dvcPull = 'dvc:pull';
+  export const dvcPush = 'dvc:push';
   export const seldonModelDeploy = 'seldon:model-deploy';
   export const gitOpenUrl = 'git:open-url';
   export const gitToggleSimpleStaging = 'git:toggle-simple-staging';
@@ -177,6 +180,32 @@ export function addCommands(
         await model.dvc_init(currentPath);
         // model.pathRepository = currentPath;
       }
+    }
+  });
+
+  /** Add dvc pull command */
+  commands.addCommand(CommandIDs.dvcPull, {
+    label: 'Pull',
+    caption: 'Pull latest data from the repo',
+    execute: async () => {
+      await showDialog({
+        title: 'Pull latest data from the repo',
+        body: new GitPullPushDialog(model, Operation.DvcPull),
+        buttons: [Dialog.okButton({ label: 'DISMISS' })]
+      });
+    }
+  });
+
+  /** Add dvc push command */
+  commands.addCommand(CommandIDs.dvcPush, {
+    label: 'Push',
+    caption: 'Push latest data to the repo',
+    execute: async () => {
+      await showDialog({
+        title: 'Push latest data to the repo',
+        body: new GitPullPushDialog(model, Operation.DvcPush),
+        buttons: [Dialog.okButton({ label: 'DISMISS' })]
+      });
     }
   });
 

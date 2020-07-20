@@ -196,9 +196,11 @@ function createDvcMenu(
 
   const menu = new Menu({ commands });
   menu.title.label = 'DVC';
-  [CommandIDs.dvcInit].forEach(command => {
-    menu.addItem({ command });
-  });
+  [CommandIDs.dvcInit, CommandIDs.dvcPull, CommandIDs.dvcPush].forEach(
+    command => {
+      menu.addItem({ command });
+    }
+  );
 
   return menu;
 }
