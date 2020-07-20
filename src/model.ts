@@ -266,7 +266,6 @@ export class GitExtension implements IGitExtension {
     filepath: string,
     seldon_detail: Git.ISeldonDetail
   ): Promise<Response> {
-    await this.ready;
     const path = this.pathRepository;
 
     if (path === null) {

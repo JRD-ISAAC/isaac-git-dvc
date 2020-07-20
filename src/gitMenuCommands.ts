@@ -106,7 +106,7 @@ export function addCommands(
   });
 
   commands.addCommand(CommandIDs.seldonModelDeploy, {
-    label: 'Deploy To Seldon',
+    label: 'Deploy Model',
     iconClass: 'jp-MaterialIcon jp-AddIcon',
     caption: 'Deploy the model file to seldon.',
     execute: async () => {
