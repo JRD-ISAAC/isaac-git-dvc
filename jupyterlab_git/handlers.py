@@ -608,7 +608,7 @@ class ArgoSendHandler(GitHandler):
         current_path = self.get_json_body()["current_path"]
         body = await self.git.argo_send(current_path)
 
-        if body["code"] != 0:
+        if body["code"] != 200:
             self.set_status(500)
 
         self.finish(json.dumps(body))

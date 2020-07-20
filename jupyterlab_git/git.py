@@ -1022,7 +1022,7 @@ class Git:
         with open(Path(current_path) / 'workflow.yaml', 'r') as f:
             workflow = yaml.safe_load(f)
 
-        REQUEST_URL = 'http://pipelines.isaac.jnj.com/api/v1/workflows/default'
+        REQUEST_URL = 'https://pipelines.isaac.jnj.com/api/v1/workflows/default'
 
         data = {}
 
@@ -1039,7 +1039,7 @@ class Git:
         data['workflow'] = workflow
 
         try:
-            response = requests.post(REQUEST_URL, json=data)
+            response = requests.post(REQUEST_URL, json=data, verify=False)
             print(response.status_code, response.reason)
         except Exception as error:
             return {"code": -1, "message": error}
