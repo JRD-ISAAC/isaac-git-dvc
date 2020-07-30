@@ -1,6 +1,5 @@
 import { Spinner } from '@jupyterlab/apputils';
 import { Widget } from '@lumino/widgets';
-import { AUTH_ERROR_MESSAGES } from '../git';
 import { Git, IGitExtension } from '../tokens';
 
 /**
@@ -26,10 +25,8 @@ export class SendWorkflowDialog extends Widget {
 
     this._model
       .send_workflow(currentPath)
-      .then(response => {
-        this.handleResponse(response);
-      })
-      .catch(() => this.handleError());
+      .then(response => this.handleResponse(response))
+      .catch(response => this.handleResponse(response));
   }
 
   /**
@@ -41,16 +38,7 @@ export class SendWorkflowDialog extends Widget {
     this.node.removeChild(this._spinner.node);
     this._spinner.dispose();
     if (response.code !== 0) {
-      if (
-        AUTH_ERROR_MESSAGES.map(
-          message => response.message.indexOf(message) > -1
-        ).indexOf(true) > -1
-      ) {
-        this.handleError(response.message);
-        this.parent!.parent!.close(); // eslint-disable-line @typescript-eslint/no-non-null-assertion
-      } else {
-        this.handleError(response.message);
-      }
+      this.handleError(response.message);
     } else {
       this.handleSuccess();
     }
@@ -116,10 +104,8 @@ export class SeldonDeployDialog extends Widget {
 
     this._model
       .seldon_deploy(filename, filepath, seldon_detail)
-      .then(response => {
-        this.handleResponse(response);
-      })
-      .catch(() => this.handleError());
+      .then(response => this.handleResponse(response))
+      .catch(response => this.handleResponse(response));
   }
 
   /**
@@ -131,16 +117,7 @@ export class SeldonDeployDialog extends Widget {
     this.node.removeChild(this._spinner.node);
     this._spinner.dispose();
     if (response.code !== 0) {
-      if (
-        AUTH_ERROR_MESSAGES.map(
-          message => response.message.indexOf(message) > -1
-        ).indexOf(true) > -1
-      ) {
-        this.handleError(response.message);
-        this.parent!.parent!.close(); // eslint-disable-line @typescript-eslint/no-non-null-assertion
-      } else {
-        this.handleError(response.message);
-      }
+      this.handleError(response.message);
     } else {
       this.handleSuccess();
     }

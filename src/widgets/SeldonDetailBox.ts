@@ -21,6 +21,7 @@ export class SeldonDetailForm extends Widget
     node.className = 'jp-RedirectForm';
     text.textContent = 'Enter model name and pre-packaged server details';
     this._model_name.placeholder = 'Model name';
+    this._model_name.required = true;
 
     const option1 = document.createElement('option');
     option1.value = 'SKLEARN_SERVER';
