@@ -526,6 +526,17 @@ export namespace Git {
     message?: string;
   }
 
+  export interface IWorkflowMetadata {
+    name: string;
+    namespace: string;
+    selfLink: string;
+    uid: string;
+  }
+
+  export interface IWorkflowResult {
+    metadata: IWorkflowMetadata;
+  }
+
   /**
    * Interface for a marker obj
    */

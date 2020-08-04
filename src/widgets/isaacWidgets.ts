@@ -37,10 +37,10 @@ export class SendWorkflowDialog extends Widget {
   private async handleResponse(response: Git.IPushPullResult) {
     this.node.removeChild(this._spinner.node);
     this._spinner.dispose();
-    if (response.code !== 0) {
+    if (response.code !== 200) {
       this.handleError(response.message);
     } else {
-      this.handleSuccess();
+      this.handleSuccess(response);
     }
   }
 
@@ -62,11 +62,22 @@ export class SendWorkflowDialog extends Widget {
     this._body.appendChild(label);
   }
 
-  private handleSuccess(): void {
+  private handleSuccess(response: Git.IPushPullResult): void {
     const label = document.createElement('label');
     const text = document.createElement('span');
-    text.textContent = 'Operation completed successfully';
+    const link = document.createElement('a');
+    const { metadata } = (response.message as unknown) as Git.IWorkflowResult;
+    const workflowUrl = `https://pipelines.isaac.jnj.com/workflows/default/${
+      metadata.name
+    }`;
+
+    link.setAttribute('href', workflowUrl);
+    link.setAttribute('target', '_blank');
+    link.style.color = 'blue';
+    link.innerHTML = 'Click here for seeing your result';
+    text.textContent = `Worflow "${metadata.name}" scheduled successfully. `;
     label.appendChild(text);
+    label.appendChild(link);
     this._body.appendChild(label);
   }
   private createBody(): HTMLElement {
@@ -83,6 +94,7 @@ export class SeldonDeployDialog extends Widget {
   private _spinner: Spinner;
   private _model: IGitExtension;
   private _body: HTMLElement;
+  private _seldon_detail: Git.ISeldonDetail;
 
   /**
    * Instantiates the dialog and makes the relevant service API call.
@@ -106,6 +118,8 @@ export class SeldonDeployDialog extends Widget {
       .seldon_deploy(filename, filepath, seldon_detail)
       .then(response => this.handleResponse(response))
       .catch(response => this.handleResponse(response));
+
+    this._seldon_detail = seldon_detail;
   }
 
   /**
@@ -144,8 +158,16 @@ export class SeldonDeployDialog extends Widget {
   private handleSuccess(): void {
     const label = document.createElement('label');
     const text = document.createElement('span');
-    text.textContent = 'Operation completed successfully';
+    const modelName = this._seldon_detail.model_name;
+    const link = document.createElement('a');
+    const seldonUrl = `https://models.isaac.jnj.com/seldon-deploy/deployments/dashboard?namespace=seldon&name=${modelName}&kind=SeldonDeployment`;
+    link.setAttribute('href', seldonUrl);
+    link.setAttribute('target', '_blank');
+    link.style.color = 'blue';
+    link.innerHTML = 'Click here for seeing your result';
+    text.textContent = 'Model scheduled. ';
     label.appendChild(text);
+    label.appendChild(link);
     this._body.appendChild(label);
   }
   private createBody(): HTMLElement {
