@@ -67,9 +67,7 @@ export class SendWorkflowDialog extends Widget {
     const text = document.createElement('span');
     const link = document.createElement('a');
     const { metadata } = (response.message as unknown) as Git.IWorkflowResult;
-    const workflowUrl = `https://pipelines.isaac.jnj.com/workflows/default/${
-      metadata.name
-    }`;
+    const workflowUrl = `https://isaac.jnj.com/pipelines/${metadata.name}`;
 
     link.setAttribute('href', workflowUrl);
     link.setAttribute('target', '_blank');
