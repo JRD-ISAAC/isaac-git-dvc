@@ -158,7 +158,7 @@ export class SeldonDeployDialog extends Widget {
     const text = document.createElement('span');
     const modelName = this._seldon_detail.model_name;
     const link = document.createElement('a');
-    const seldonUrl = `https://models.isaac.jnj.com/seldon-deploy/deployments/dashboard?namespace=seldon&name=${modelName}&kind=SeldonDeployment`;
+    const seldonUrl = `https://isaac.jnj.com/model-studio/deployments/dashboard?namespace=seldon&name=${modelName}&kind=SeldonDeployment`;
     link.setAttribute('href', seldonUrl);
     link.setAttribute('target', '_blank');
     link.style.color = 'blue';
