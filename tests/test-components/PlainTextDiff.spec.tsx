@@ -4,9 +4,9 @@ import * as React from 'react';
 import { IDiffProps } from '../../src/components/diff/Diff';
 import { mergeView } from '../../src/components/diff/mergeview';
 import { PlainTextDiff } from '../../src/components/diff/PlainTextDiff';
-import { httpGitRequest } from '../../src/git';
+import { requestAPI } from '../../src/git';
+import { Git } from '../../src/tokens';
 import * as diffResponse from '../test-components/data/textDiffResponse.json';
-import { createTestResponse } from './testutils';
 
 jest.mock('../../src/git');
 jest.mock('../../src/components/diff/mergeview');
@@ -23,36 +23,42 @@ describe('PlainTextDiff', () => {
       }
     };
 
-    const jsonResult = Promise.resolve({
-      message: 'TEST_ERROR_MESSAGE'
-    });
-
-    (httpGitRequest as jest.Mock).mockReturnValueOnce(
-      createTestResponse(401, jsonResult)
+    (requestAPI as jest.Mock).mockRejectedValueOnce(
+      new Git.GitResponseError(
+        new Response('', { status: 401 }),
+        'TEST_ERROR_MESSAGE'
+      )
     );
 
     // When
     const node = shallow<PlainTextDiff>(<PlainTextDiff {...props} />);
 
     // Then
-    await jsonResult;
-
-    node.update();
-
-    expect(httpGitRequest).toHaveBeenCalled();
-    expect(httpGitRequest).toBeCalledWith('/git/diffcontent', 'POST', {
-      curr_ref: {
-        special: 'WORKING'
-      },
-      filename: '/path/to/File.py',
-      prev_ref: {
-        git: '83baee'
-      },
-      top_repo_path: '/top/repo/path'
+    let resolveTest: (value?: any) => void;
+    const terminateTest = new Promise(resolve => {
+      resolveTest = resolve;
     });
-    expect(node.find('.jp-git-diff-error').text()).toContain(
-      'TEST_ERROR_MESSAGE'
-    );
+    setImmediate(() => {
+      expect(requestAPI).toHaveBeenCalled();
+      expect(requestAPI).toBeCalledWith('diffcontent', 'POST', {
+        curr_ref: {
+          special: 'WORKING'
+        },
+        filename: '/path/to/File.py',
+        prev_ref: {
+          git: '83baee'
+        },
+        top_repo_path: '/top/repo/path'
+      });
+      expect(
+        node
+          .update()
+          .find('.jp-git-diff-error')
+          .text()
+      ).toContain('TEST_ERROR_MESSAGE');
+      resolveTest();
+    });
+    await terminateTest;
   });
 
   it('should render header and cell diff components in success case', async () => {
@@ -66,11 +72,7 @@ describe('PlainTextDiff', () => {
       }
     };
 
-    const jsonResult = Promise.resolve(diffResponse);
-
-    (httpGitRequest as jest.Mock).mockReturnValueOnce(
-      createTestResponse(200, jsonResult)
-    );
+    (requestAPI as jest.Mock).mockResolvedValueOnce(diffResponse);
 
     const mockMergeView = mergeView as jest.Mocked<typeof mergeView>;
 
@@ -78,21 +80,26 @@ describe('PlainTextDiff', () => {
     const node = shallow<PlainTextDiff>(<PlainTextDiff {...props} />);
 
     // Then
-    await jsonResult;
-    node.update();
-
-    expect(httpGitRequest).toHaveBeenCalled();
-    expect(httpGitRequest).toBeCalledWith('/git/diffcontent', 'POST', {
-      curr_ref: {
-        special: 'WORKING'
-      },
-      filename: '/path/to/File.py',
-      prev_ref: {
-        git: '83baee'
-      },
-      top_repo_path: '/top/repo/path'
+    let resolveTest: (value?: any) => void;
+    const terminateTest = new Promise(resolve => {
+      resolveTest = resolve;
     });
-    expect(node.find('.jp-git-diff-error')).toHaveLength(0);
-    expect(mockMergeView).toBeCalled();
+    setImmediate(() => {
+      expect(requestAPI).toHaveBeenCalled();
+      expect(requestAPI).toBeCalledWith('diffcontent', 'POST', {
+        curr_ref: {
+          special: 'WORKING'
+        },
+        filename: '/path/to/File.py',
+        prev_ref: {
+          git: '83baee'
+        },
+        top_repo_path: '/top/repo/path'
+      });
+      expect(node.update().find('.jp-git-diff-error')).toHaveLength(0);
+      expect(mockMergeView).toBeCalled();
+      resolveTest();
+    });
+    await terminateTest;
   });
 });

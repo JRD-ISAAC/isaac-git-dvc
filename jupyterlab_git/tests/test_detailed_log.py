@@ -1,9 +1,8 @@
 # python lib
-import os
+from pathlib import Path
 from unittest.mock import Mock, call, patch
 
 import pytest
-import tornado
 
 # local lib
 from jupyterlab_git.git import Git
@@ -28,9 +27,8 @@ async def test_detailed_log():
             "-\t-\tbinary_file.png",
         ]
 
-
         mock_execute.return_value = maybe_future(
-            (0, "\x00".join(process_output)+"\x00", "")
+            (0, "\x00".join(process_output) + "\x00", "")
         )
 
         expected_response = {
@@ -93,12 +91,9 @@ async def test_detailed_log():
         }
 
         # When
-        actual_response = (await
-            Git(FakeContentManager("/bin"))
-            .detailed_log(
-                selected_hash="f29660a2472e24164906af8653babeb48e4bf2ab",
-                current_path="test_curr_path",
-            )
+        actual_response = await Git(FakeContentManager(Path("/bin"))).detailed_log(
+            selected_hash="f29660a2472e24164906af8653babeb48e4bf2ab",
+            current_path="test_curr_path",
         )
 
         # Then
@@ -112,7 +107,7 @@ async def test_detailed_log():
                 "-z",
                 "f29660a2472e24164906af8653babeb48e4bf2ab",
             ],
-            cwd=os.path.join("/bin", "test_curr_path"),
+            cwd=str(Path("/bin") / "test_curr_path"),
         )
 
         assert expected_response == actual_response

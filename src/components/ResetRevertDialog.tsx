@@ -1,25 +1,25 @@
-import * as React from 'react';
-import TextareaAutosize from 'react-textarea-autosize';
-import { classes } from 'typestyle';
-import { showErrorMessage } from '@jupyterlab/apputils';
 import Dialog from '@material-ui/core/Dialog';
 import DialogActions from '@material-ui/core/DialogActions';
 import ClearIcon from '@material-ui/icons/Clear';
-import { Git, IGitExtension } from '../tokens';
+import * as React from 'react';
+import TextareaAutosize from 'react-textarea-autosize';
+import { classes } from 'typestyle';
+import { Logger } from '../logger';
 import {
   actionsWrapperClass,
-  commitFormClass,
-  commitSummaryClass,
-  commitDescriptionClass,
   buttonClass,
   cancelButtonClass,
   closeButtonClass,
+  commitDescriptionClass,
+  commitFormClass,
+  commitSummaryClass,
   contentWrapperClass,
   resetRevertDialogClass,
   submitButtonClass,
   titleClass,
   titleWrapperClass
 } from '../style/ResetRevertDialog';
+import { Git, IGitExtension, Level } from '../tokens';
 
 /**
  * Interface describing component properties.
@@ -39,6 +39,11 @@ export interface IResetRevertDialogProps {
    * Extension data model.
    */
   model: IGitExtension;
+
+  /**
+   * Extension logger
+   */
+  logger: Logger;
 
   /**
    * Boolean indicating whether to show the dialog.
@@ -72,14 +77,14 @@ export interface IResetRevertDialogState {
 }
 
 /**
- * React component for rendering a dialog for reseting or reverting a single commit.
+ * React component for rendering a dialog for resetting or reverting a single commit.
  */
 export class ResetRevertDialog extends React.Component<
   IResetRevertDialogProps,
   IResetRevertDialogState
 > {
   /**
-   * Returns a React component for reseting or reverting a single commit.
+   * Returns a React component for resetting or reverting a single commit.
    *
    * @param props - component properties
    * @returns React component
@@ -94,12 +99,13 @@ export class ResetRevertDialog extends React.Component<
   }
 
   /**
-   * Renders the component.
+   * Renders a dialog.
    *
    * @returns React element
    */
   render(): React.ReactElement {
     const shortCommit = this.props.commit.commit.slice(0, 7);
+    const isRevert = this.props.action === 'revert';
     return (
       <Dialog
         classes={{
@@ -111,9 +117,7 @@ export class ResetRevertDialog extends React.Component<
       >
         <div className={titleWrapperClass}>
           <p className={titleClass}>
-            {this.props.action === 'revert'
-              ? 'Revert Changes'
-              : 'Reset Changes'}
+            {isRevert ? 'Revert Changes' : 'Reset Changes'}
           </p>
           <button className={closeButtonClass}>
             <ClearIcon
@@ -125,11 +129,11 @@ export class ResetRevertDialog extends React.Component<
         </div>
         <div className={contentWrapperClass}>
           <p>
-            {this.props.action === 'revert'
+            {isRevert
               ? "These changes will be reverted. Only commit if you're sure you're okay losing these changes."
               : `All changes after commit ${shortCommit} will be gone forever (hard reset). Are you sure?`}
           </p>
-          {this.props.action === 'revert' ? (
+          {isRevert ? (
             <div className={commitFormClass}>
               <input
                 className={commitSummaryClass}
@@ -215,36 +219,71 @@ export class ResetRevertDialog extends React.Component<
   };
 
   /**
+   * Reset the current branch on the provided commit
+   *
+   * @param hash Git commit hash
+   */
+  private async _resetCommit(hash: string): Promise<void> {
+    this.props.logger.log({
+      level: Level.RUNNING,
+      message: 'Discarding changes...'
+    });
+    try {
+      await this.props.model.resetToCommit(hash);
+      this.props.logger.log({
+        level: Level.SUCCESS,
+        message: 'Successfully discarded changes.'
+      });
+    } catch (error) {
+      this.props.logger.log({
+        level: Level.ERROR,
+        message: 'Failed to discard changes.',
+        error: new Error(
+          `Failed to discard changes after ${hash.slice(0, 7)}: ${error}`
+        )
+      });
+    }
+  }
+
+  /**
+   * Revert the provided commit.
+   *
+   * @param hash Git commit hash
+   */
+  private async _revertCommit(hash: string): Promise<void> {
+    this.props.logger.log({
+      level: Level.RUNNING,
+      message: 'Reverting changes...'
+    });
+    try {
+      await this.props.model.revertCommit(this._commitMessage(), hash);
+      this.props.logger.log({
+        level: Level.SUCCESS,
+        message: 'Successfully reverted changes.'
+      });
+    } catch (error) {
+      this.props.logger.log({
+        level: Level.ERROR,
+        message: 'Failed to revert changes.',
+        error: new Error(`Failed to revert ${hash.slice(0, 7)}: ${error}`)
+      });
+    }
+  }
+
+  /**
    * Callback invoked upon clicking a button to reset or revert a commit.
    *
    * @param event - event object
    */
   private _onSubmit = async (): Promise<void> => {
-    const shortCommit = this.props.commit.commit.slice(0, 7);
     this.setState({
       disabled: true
     });
+
     if (this.props.action === 'reset') {
-      try {
-        await this.props.model.resetToCommit(this.props.commit.commit);
-      } catch (err) {
-        showErrorMessage(
-          'Error Removing Changes',
-          `Failed to discard changes after ${shortCommit}: ${err}`
-        );
-      }
+      this._resetCommit(this.props.commit.commit);
     } else {
-      try {
-        await this.props.model.revertCommit(
-          this._commitMessage(),
-          this.props.commit.commit
-        );
-      } catch (err) {
-        showErrorMessage(
-          'Error Reverting Changes',
-          `Failed to revert ${shortCommit}: ${err}`
-        );
-      }
+      this._revertCommit(this.props.commit.commit);
     }
     this._reset();
     this.props.onClose();

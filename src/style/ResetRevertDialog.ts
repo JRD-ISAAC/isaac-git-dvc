@@ -90,15 +90,36 @@ export const buttonClass = style({
 });
 
 export const cancelButtonClass = style({
-  backgroundColor: '#757575'
+  backgroundColor: 'var(--md-grey-500)',
+
+  $nest: {
+    '&:hover': {
+      backgroundColor: 'var(--md-grey-600)'
+    },
+    '&:active': {
+      backgroundColor: 'var(--md-grey-700)'
+    }
+  }
 });
 
 export const submitButtonClass = style({
-  backgroundColor: 'var(--jp-brand-color1)',
+  backgroundColor: 'var(--md-blue-500)',
 
   $nest: {
+    '&:hover': {
+      backgroundColor: 'var(--md-blue-600)'
+    },
+    '&:active': {
+      backgroundColor: 'var(--md-blue-700)'
+    },
     '&:disabled': {
       color: 'var(--jp-ui-inverse-font-color0)',
+      backgroundColor: 'var(--jp-layout-color3)'
+    },
+    '&:disabled:hover': {
+      backgroundColor: 'var(--jp-layout-color3)'
+    },
+    '&:disabled:active': {
       backgroundColor: 'var(--jp-layout-color3)'
     }
   }
@@ -126,7 +147,7 @@ export const commitSummaryClass = style({
   outline: 'none',
   overflowX: 'auto',
 
-  color: 'var(--jp-ui-font-color0)',
+  color: 'var(--jp-ui-font-color1)',
   fontSize: 'var(--jp-ui-font-size1)',
   fontWeight: 300,
 
@@ -154,7 +175,7 @@ export const commitDescriptionClass = style({
   overflowX: 'auto',
   resize: 'none',
 
-  color: 'var(--jp-ui-font-color0)',
+  color: 'var(--jp-ui-font-color1)',
   fontSize: 'var(--jp-ui-font-size1)',
   fontWeight: 300,
 

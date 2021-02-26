@@ -3,7 +3,7 @@
 // Distributed under an MIT license: https://codemirror.net/LICENSE
 
 // The linter must be relaxed on this imported file.
-/* eslint-disable @typescript-eslint/ban-ts-ignore */
+/* eslint-disable @typescript-eslint/ban-ts-comment */
 /* eslint-disable eqeqeq */
 /* eslint-disable no-inner-declarations */
 /* eslint-disable prefer-arrow-callback */

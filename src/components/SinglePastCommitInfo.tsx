@@ -1,27 +1,38 @@
-import * as React from 'react';
-import { IRenderMimeRegistry } from '@jupyterlab/rendermime';
 import { fileIcon } from '@jupyterlab/ui-components';
-import { insertionsMadeIcon, deletionsMadeIcon } from '../style/icons';
-import { classes } from 'typestyle/';
+import { CommandRegistry } from '@lumino/commands';
+import * as React from 'react';
+import { FixedSizeList, ListChildComponentProps } from 'react-window';
+import { classes } from 'typestyle';
+import { CommandIDs } from '../commandsAndMenu';
+import { LoggerContext } from '../logger';
 import { GitExtension } from '../model';
-import { Git } from '../tokens';
+import {
+  deletionsMadeIcon,
+  diffIcon,
+  discardIcon,
+  insertionsMadeIcon,
+  rewindIcon
+} from '../style/icons';
 import {
   actionButtonClass,
   commitClass,
+  commitDetailClass,
   commitDetailFileClass,
   commitDetailHeaderClass,
-  commitDetailClass,
   commitOverviewNumbersClass,
   deletionsIconClass,
   fileListClass,
   iconClass,
   insertionsIconClass
 } from '../style/SinglePastCommitInfo';
-import { isDiffSupported } from './diff/Diff';
-import { openDiffView } from './diff/DiffWidget';
-import { ResetRevertDialog } from './ResetRevertDialog';
-import { FilePath } from './FilePath';
+import { Git } from '../tokens';
 import { ActionButton } from './ActionButton';
+import { isDiffSupported } from './diff/Diff';
+import { FilePath } from './FilePath';
+import { ResetRevertDialog } from './ResetRevertDialog';
+
+const ITEM_HEIGHT = 24; // File list item height
+const MAX_VISIBLE_FILES = 20; // Maximal number of file display at once
 
 /**
  * Interface describing component properties.
@@ -38,9 +49,9 @@ export interface ISinglePastCommitInfoProps {
   model: GitExtension;
 
   /**
-   * Render MIME type registry.
+   * Jupyter App commands registry
    */
-  renderMime: IRenderMimeRegistry;
+  commands: CommandRegistry;
 }
 
 /**
@@ -119,9 +130,17 @@ export class SinglePastCommitInfo extends React.Component<
    * Callback invoked immediately after mounting a component (i.e., inserting into a tree).
    */
   async componentDidMount(): Promise<void> {
-    let log: Git.ISingleCommitFilePathInfo;
     try {
-      log = await this.props.model.detailedLog(this.props.commit.commit);
+      const log = await this.props.model.detailedLog(this.props.commit.commit);
+
+      this.setState({
+        info: log.modified_file_note,
+        numFiles: log.modified_files_count,
+        insertions: log.number_of_insertions,
+        deletions: log.number_of_deletions,
+        modifiedFiles: log.modified_files,
+        loadingState: 'success'
+      });
     } catch (err) {
       console.error(
         `Error while getting detailed log for commit ${
@@ -131,16 +150,6 @@ export class SinglePastCommitInfo extends React.Component<
       );
       this.setState({ loadingState: 'error' });
       return;
-    }
-    if (log.code === 0) {
-      this.setState({
-        info: log.modified_file_note,
-        numFiles: log.modified_files_count,
-        insertions: log.number_of_insertions,
-        deletions: log.number_of_deletions,
-        modifiedFiles: log.modified_files,
-        loadingState: 'success'
-      });
     }
   }
 
@@ -160,27 +169,21 @@ export class SinglePastCommitInfo extends React.Component<
       <div>
         <div className={commitClass}>
           <div className={commitOverviewNumbersClass}>
-            <span>
-              <fileIcon.react
-                className={iconClass}
-                tag="span"
-                title="# Files Changed"
-              />
+            <span title="# Files Changed">
+              <fileIcon.react className={iconClass} tag="span" />
               {this.state.numFiles}
             </span>
-            <span>
+            <span title="# Insertions">
               <insertionsMadeIcon.react
                 className={classes(iconClass, insertionsIconClass)}
-                tag="div"
-                title="# Insertions"
+                tag="span"
               />
               {this.state.insertions}
             </span>
-            <span>
+            <span title="# Deletions">
               <deletionsMadeIcon.react
                 className={classes(iconClass, deletionsIconClass)}
-                tag="div"
-                title="# Deletions"
+                tag="span"
               />
               {this.state.deletions}
             </span>
@@ -191,67 +194,77 @@ export class SinglePastCommitInfo extends React.Component<
             Changed
             <ActionButton
               className={actionButtonClass}
-              iconName="git-discard"
+              icon={discardIcon}
               title="Revert changes introduced by this commit"
               onClick={this._onRevertClick}
             />
             <ActionButton
               className={actionButtonClass}
-              iconName="git-rewind"
+              icon={rewindIcon}
               title="Discard changes introduced *after* this commit (hard reset)"
               onClick={this._onResetClick}
             />
-            <ResetRevertDialog
-              open={this.state.resetRevertDialog}
-              action={this.state.resetRevertAction}
-              model={this.props.model}
-              commit={this.props.commit}
-              onClose={this._onResetRevertDialogClose}
-            />
+            <LoggerContext.Consumer>
+              {logger => (
+                <ResetRevertDialog
+                  open={this.state.resetRevertDialog}
+                  action={this.state.resetRevertAction}
+                  model={this.props.model}
+                  logger={logger}
+                  commit={this.props.commit}
+                  onClose={this._onResetRevertDialogClose}
+                />
+              )}
+            </LoggerContext.Consumer>
           </div>
-          <ul className={fileListClass}>
-            {this.state.modifiedFiles.length > 0
-              ? this._renderFileList()
-              : null}
-          </ul>
+          {this.state.modifiedFiles.length > 0 && (
+            <FixedSizeList
+              className={fileListClass}
+              height={
+                Math.min(MAX_VISIBLE_FILES, this.state.modifiedFiles.length) *
+                ITEM_HEIGHT
+              }
+              innerElementType="ul"
+              itemCount={this.state.modifiedFiles.length}
+              itemData={this.state.modifiedFiles}
+              itemKey={(index, data) => data[index].modified_file_path}
+              itemSize={ITEM_HEIGHT}
+              style={{ overflowX: 'hidden' }}
+              width={'auto'}
+            >
+              {this._renderFile}
+            </FixedSizeList>
+          )}
         </div>
       </div>
     );
   }
 
   /**
-   * Renders a list of modified files.
-   *
-   * @returns array of React elements
-   */
-  private _renderFileList(): React.ReactElement[] {
-    return this.state.modifiedFiles.map(this._renderFile, this);
-  }
-
-  /**
    * Renders a modified file.
    *
-   * @param file - modified file
-   * @param idx - file index
+   * @param props Row properties
    * @returns React element
    */
-  private _renderFile(file: Git.ICommitModifiedFile): React.ReactElement {
+  private _renderFile = (props: ListChildComponentProps): JSX.Element => {
+    const { data, index, style } = props;
+    const file = data[index];
     const path = file.modified_file_path;
     const flg = isDiffSupported(path) || !file.is_binary;
     return (
       <li
         className={commitDetailFileClass}
-        key={path}
         onClick={this._onDiffClickFactory(path, flg)}
+        style={style}
         title={path}
       >
-        <FilePath filepath={path} />
+        <FilePath filepath={path} filetype={file.type} />
         {flg ? (
-          <ActionButton iconName="git-diff" title="View file changes" />
+          <ActionButton icon={diffIcon} title="View file changes" />
         ) : null}
       </li>
     );
-  }
+  };
 
   /**
    * Callback invoked upon a clicking a button to revert changes.
@@ -326,20 +339,18 @@ export class SinglePastCommitInfo extends React.Component<
       event.stopPropagation();
 
       try {
-        await openDiffView(
-          fpath,
-          self.props.model,
-          {
+        self.props.commands.execute(CommandIDs.gitFileDiff, {
+          filePath: fpath,
+          isText: bool,
+          context: {
             previousRef: {
               gitRef: self.props.commit.pre_commit
             },
             currentRef: {
               gitRef: self.props.commit.commit
             }
-          },
-          self.props.renderMime,
-          bool
-        );
+          }
+        });
       } catch (err) {
         console.error(`Failed to open diff view for ${fpath}.\n${err}`);
       }

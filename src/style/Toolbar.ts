@@ -17,17 +17,11 @@ export const toolbarNavClass = style({
 
   backgroundColor: 'var(--jp-layout-color1)',
 
-  borderBottomStyle: 'solid',
-  borderBottomWidth: 'var(--jp-border-width)',
-  borderBottomColor: 'var(--jp-border-color2)'
+  borderBottom: 'var(--jp-border-width) solid var(--jp-border-color2)'
 });
 
 export const toolbarMenuWrapperClass = style({
-  background: 'var(--jp-layout-color1)',
-
-  borderBottomStyle: 'solid',
-  borderBottomWidth: 'var(--jp-border-width)',
-  borderBottomColor: 'var(--jp-border-color2)'
+  background: 'var(--jp-layout-color1)'
 });
 
 export const toolbarMenuButtonClass = style({
@@ -44,10 +38,11 @@ export const toolbarMenuButtonClass = style({
 
   fontSize: 'var(--jp-ui-font-size1)',
   lineHeight: '1.5em',
-  color: 'var(--jp-ui-font-color0)',
+  color: 'var(--jp-ui-font-color1)',
   textAlign: 'left',
 
   border: 'none',
+  borderBottom: 'var(--jp-border-width) solid var(--jp-border-color2)',
   borderRadius: 0,
 
   background: 'var(--jp-layout-color1)'
@@ -101,83 +96,37 @@ export const toolbarButtonClass = style({
   outline: 'none',
 
   $nest: {
+    '&:disabled': {
+      opacity: 0.4,
+      background: 'none',
+      cursor: 'not-allowed'
+    },
+
     '&:hover': {
       backgroundColor: 'var(--jp-layout-color2)'
     },
     '&:active': {
       backgroundColor: 'var(--jp-layout-color3)'
+    },
+
+    '& span': {
+      // Set icon width and centers it
+      margin: 'auto',
+      width: '16px'
     }
   }
 });
 
-export const pullButtonClass = style({
-  marginLeft: 'auto',
-
-  background: 'var(--jp-layout-color1)',
-  backgroundImage: 'var(--jp-icon-git-pull)',
-  backgroundSize: '16px',
-  backgroundRepeat: 'no-repeat',
-  backgroundPosition: 'center'
+export const spacer = style({
+  flex: '1 1 auto'
 });
 
-export const pushButtonClass = style({
-  background: 'var(--jp-layout-color1)',
-  backgroundImage: 'var(--jp-icon-git-push)',
-  backgroundSize: '16px',
-  backgroundRepeat: 'no-repeat',
-  backgroundPosition: 'center'
-});
-
-export const dvcPushButtonClass = style({
-  background: 'var(--jp-layout-color1)',
-  backgroundImage: 'var(--jp-icon-dvc-push)',
-  backgroundSize: '16px',
-  backgroundRepeat: 'no-repeat',
-  backgroundPosition: 'center'
-});
-
-export const dvcPullButtonClass = style({
-  background: 'var(--jp-layout-color1)',
-  backgroundImage: 'var(--jp-icon-dvc-pull)',
-  backgroundSize: '16px',
-  backgroundRepeat: 'no-repeat',
-  backgroundPosition: 'center'
-});
-
-export const refreshButtonClass = style({
-  marginRight: '4px',
-
-  background: 'var(--jp-layout-color1)',
-  backgroundImage: 'var(--jp-icon-refresh)',
-  backgroundSize: '16px',
-  backgroundRepeat: 'no-repeat',
-  backgroundPosition: 'center'
-});
-
-export const repoIconClass = style({
-  backgroundImage: 'var(--jp-icon-git-repo)',
-  backgroundSize: '16px',
-  backgroundRepeat: 'no-repeat',
-  backgroundPosition: 'center'
-});
-
-export const branchIconClass = style({
-  backgroundImage: 'var(--jp-icon-git-branch)',
-  backgroundSize: '16px',
-  backgroundRepeat: 'no-repeat',
-  backgroundPosition: 'center'
-});
-
-export const openMenuIconClass = style({
-  backgroundImage: 'var(--jp-icon-caret-down)',
-  backgroundSize: '20px',
-  backgroundRepeat: 'no-repeat',
-  backgroundPosition: 'center'
-});
-
-export const closeMenuIconClass = style({
-  backgroundImage: 'var(--jp-icon-caret-up)',
-  backgroundSize: '20px',
-  backgroundRepeat: 'no-repeat',
-  backgroundPosition: 'center'
+export const badgeClass = style({
+  $nest: {
+    '& > .MuiBadge-badge': {
+      top: 12,
+      right: 15,
+      backgroundColor: 'var(--jp-warn-color1)'
+    }
+  }
 });

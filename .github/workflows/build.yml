@@ -1,0 +1,86 @@
+name: Build
+
+on:
+  push:
+    branches: master
+  pull_request:
+    branches: "*"
+
+jobs:
+  test-3x:
+    name: Test Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.6", "3.7", "3.8", "3.9"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Install node
+        uses: actions/setup-node@v1
+        with:
+          node-version: "12.x"
+      - name: Setup Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+          architecture: "x64"
+
+      - name: Get pip cache dir
+        id: pip-cache
+        run: |
+          echo "::set-output name=dir::$(pip cache dir)"
+
+      - name: pip cache
+        uses: actions/cache@v2
+        with:
+          path: ${{ steps.pip-cache.outputs.dir }}
+          key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('**/setup.py') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-${{ matrix.python-version }}-
+            ${{ runner.os }}-pip-
+
+      - name: Get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "::set-output name=dir::$(yarn cache dir)"
+      - name: Setup yarn cache
+        uses: actions/cache@v2
+        id: yarn-cache # use this to check for `cache-hit` (`steps.yarn-cache.outputs.cache-hit != 'true'`)
+        env:
+          # Increase this value to reset cache
+          CACHE_NUMBER: 0
+        with:
+          path: |
+            ${{ steps.yarn-cache-dir-path.outputs.dir }}
+            **/node_modules
+          key: ${{ runner.os }}-yarn-${{ env.CACHE_NUMBER }}-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-${{ env.CACHE_NUMBER }}
+            ${{ runner.os }}-yarn-
+
+      - name: Install dependencies
+        run: python -m pip install -U  jupyter_packaging~=0.7.9 jupyterlab~=3.0 pip wheel
+      - name: Test the extension
+        run: |
+          jlpm
+          jlpm run eslint:check
+          python -m pip install -e .[dev]
+
+          # Python formatting checks
+          black . --check
+
+          # Run the Python tests
+          pytest jupyterlab_git -r ap
+          # Run the TS/JS tests
+          jlpm run test
+
+          python -m pip uninstall -y jupyterlab-git
+
+          # Integration test
+          python -m pip install .
+          jupyter server extension list 2>&1 | grep -ie "jupyterlab_git.*OK"
+
+          jupyter labextension list 2>&1 | grep -ie "@jupyterlab/git.*OK"
+          python -m jupyterlab.browser_check
+          # Run our extension-specific browser integration test
+          # python tests/test-browser/run_browser_test.py

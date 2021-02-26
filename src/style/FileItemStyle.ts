@@ -6,6 +6,7 @@ export const fileStyle = style(
     display: 'flex',
     flexDirection: 'row',
     alignItems: 'center',
+    boxSizing: 'border-box',
     color: 'var(--jp-ui-font-color1)',
     lineHeight: 'var(--jp-private-running-item-height)',
     padding: '0px 4px',
@@ -30,10 +31,16 @@ export const selectedFileStyle = style({
       background: 'var(--jp-brand-color1) !important'
     },
     '&:hover .jp-icon-selectable[fill]': {
-      fill: 'var(--jp-layout-color2)'
+      fill: 'white'
     },
     '&:hover .jp-icon-selectable[stroke]': {
-      stroke: 'var(--jp-layout-color2)'
+      stroke: 'white'
+    },
+    '& .jp-icon-selectable[fill]': {
+      fill: 'white'
+    },
+    '& .jp-icon-selectable-inverse[fill]': {
+      fill: 'var(--jp-brand-color1)'
     }
   }
 });
@@ -64,6 +71,5 @@ export const fileButtonStyle = style({
 });
 
 export const gitMarkBoxStyle = style({
-  flex: '0 0 auto',
-  margin: 'auto 8px auto 4px'
+  flex: '0 0 auto'
 });

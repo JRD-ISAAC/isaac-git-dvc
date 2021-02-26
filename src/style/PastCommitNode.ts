@@ -5,7 +5,7 @@ export const commitWrapperClass = style({
   display: 'flex',
   flexShrink: 0,
   flexDirection: 'column',
-  padding: '10px',
+  padding: '5px 0px 5px 10px',
   borderBottom: 'var(--jp-border-width) solid var(--jp-border-color2)'
 });
 
@@ -40,24 +40,24 @@ export const branchWrapperClass = style({
 
 export const branchClass = style({
   padding: '2px',
-  // Special case as black, regardless of theme, because
+  // Special case, regardless of theme, because
   // backgrounds of colors are not based on theme either
-  color: '#000000',
-  border: 'var(--jp-border-width) solid #424242',
+  color: 'var(--md-grey-900)',
+  border: 'var(--jp-border-width) solid var(--md-grey-700)',
   borderRadius: '4px',
   margin: '3px'
 });
 
 export const remoteBranchClass = style({
-  backgroundColor: '#ffcdd3'
+  backgroundColor: 'var(--md-blue-100)'
 });
 
 export const localBranchClass = style({
-  backgroundColor: '#b2ebf3'
+  backgroundColor: 'var(--md-orange-100)'
 });
 
 export const workingBranchClass = style({
-  backgroundColor: '#ffce83'
+  backgroundColor: 'var(--md-red-100)'
 });
 
 export const commitExpandedClass = style({
@@ -74,18 +74,4 @@ export const iconButtonClass = style({
 
   /* top | right | bottom | left */
   margin: 'auto 8px auto auto'
-});
-
-export const expandIconButtonClass = style({
-  backgroundImage: 'var(--jp-icon-caret-down)',
-  backgroundSize: '20px',
-  backgroundRepeat: 'no-repeat',
-  backgroundPosition: 'center'
-});
-
-export const collapseIconButtonClass = style({
-  backgroundImage: 'var(--jp-icon-caret-up)',
-  backgroundSize: '20px',
-  backgroundRepeat: 'no-repeat',
-  backgroundPosition: 'center'
 });

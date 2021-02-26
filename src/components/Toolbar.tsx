@@ -1,19 +1,25 @@
+import { PathExt } from '@jupyterlab/coreutils';
+import {
+  caretDownIcon,
+  caretUpIcon,
+  refreshIcon
+} from '@jupyterlab/ui-components';
+import { CommandRegistry } from '@lumino/commands';
+import { Badge, Tab, Tabs } from '@material-ui/core';
 import * as React from 'react';
 import { classes } from 'typestyle';
-import { Dialog, showDialog } from '@jupyterlab/apputils';
-import { PathExt } from '@jupyterlab/coreutils';
-
+import { CommandIDs } from '../commandsAndMenu';
+import { Logger } from '../logger';
 import {
-  // NOTE: keep in alphabetical order
-  branchIconClass,
-  closeMenuIconClass,
-  openMenuIconClass,
-  pullButtonClass,
-  pushButtonClass,
-  dvcPushButtonClass,
-  dvcPullButtonClass,
-  refreshButtonClass,
-  repoIconClass,
+  selectedTabClass,
+  tabClass,
+  tabIndicatorClass,
+  tabsClass
+} from '../style/GitPanel';
+import { branchIcon, desktopIcon, pullIcon, pushIcon } from '../style/icons';
+import {
+  badgeClass,
+  spacer,
   toolbarButtonClass,
   toolbarClass,
   toolbarMenuButtonClass,
@@ -25,61 +31,19 @@ import {
   toolbarMenuWrapperClass,
   toolbarNavClass
 } from '../style/Toolbar';
-import { GitCredentialsForm } from '../widgets/CredentialsBox';
-import { GitPullPushDialog, Operation } from '../widgets/gitPushPull';
-import { IGitExtension } from '../tokens';
+import { Git, IGitExtension, Level } from '../tokens';
+import { ActionButton } from './ActionButton';
 import { BranchMenu } from './BranchMenu';
+import { TagMenu } from './TagMenu';
 
 /**
- * Displays an error dialog when a Git operation fails.
- *
- * @private
- * @param model - Git extension model
- * @param operation - Git operation name
- * @returns Promise for displaying a dialog
- */
-async function showGitOperationDialog(
-  model: IGitExtension,
-  operation: Operation
-): Promise<void> {
-  const title = `Git ${operation}`;
-  let result = await showDialog({
-    title: title,
-    body: new GitPullPushDialog(model, operation),
-    buttons: [Dialog.okButton({ label: 'DISMISS' })]
-  });
-  let retry = false;
-  while (!result.button.accept) {
-    const credentials = await showDialog({
-      title: 'Git credentials required',
-      body: new GitCredentialsForm(
-        'Enter credentials for remote repository',
-        retry ? 'Incorrect username or password.' : ''
-      ),
-      buttons: [Dialog.cancelButton(), Dialog.okButton({ label: 'OK' })]
-    });
-
-    if (!credentials.button.accept) {
-      break;
-    }
-
-    result = await showDialog({
-      title: title,
-      body: new GitPullPushDialog(model, operation, credentials.value),
-      buttons: [Dialog.okButton({ label: 'DISMISS' })]
-    });
-    retry = true;
-  }
-}
-
-/**
- * Interface describing component properties.
+ * Interface describing  properties.
  */
 export interface IToolbarProps {
   /**
-   * Git extension data model.
+   * Current list of branches.
    */
-  model: IGitExtension;
+  branches: Git.IBranch[];
 
   /**
    * Boolean indicating whether branching is disabled.
@@ -87,11 +51,39 @@ export interface IToolbarProps {
   branching: boolean;
 
   /**
-   * Callback to invoke in order to refresh a repository.
-   *
-   * @returns promise which refreshes a repository
+   * Jupyter App commands registry
    */
-  refresh: () => Promise<void>;
+  commands: CommandRegistry;
+
+  /**
+   * Current branch name.
+   */
+  currentBranch: string;
+
+  /**
+   * Extension logger
+   */
+  logger: Logger;
+
+  /**
+   * Git extension data model.
+   */
+  model: IGitExtension;
+
+  /**
+   * Number of commits ahead
+   */
+  nCommitsAhead: number;
+
+  /**
+   * Number of commits behind
+   */
+  nCommitsBehind: number;
+
+  /**
+   * Current repository.
+   */
+  repository: string;
 }
 
 /**
@@ -104,19 +96,9 @@ export interface IToolbarState {
   branchMenu: boolean;
 
   /**
-   * Boolean indicating whether a repository menu is shown.
+   * Panel tab identifier.
    */
-  repoMenu: boolean;
-
-  /**
-   * Current repository.
-   */
-  repository: string;
-
-  /**
-   * Current branch name.
-   */
-  branch: string;
+  tab: number;
 }
 
 /**
@@ -132,28 +114,10 @@ export class Toolbar extends React.Component<IToolbarProps, IToolbarState> {
   constructor(props: IToolbarProps) {
     super(props);
 
-    const repo = this.props.model.pathRepository;
-
     this.state = {
       branchMenu: false,
-      repoMenu: false,
-      repository: repo || '',
-      branch: repo ? this.props.model.currentBranch.name : ''
+      tab: 0
     };
-  }
-
-  /**
-   * Callback invoked immediately after mounting a component (i.e., inserting into a tree).
-   */
-  componentDidMount(): void {
-    this._addListeners();
-  }
-
-  /**
-   * Callback invoked when a component will no longer be mounted.
-   */
-  componentWillUnmount(): void {
-    this._removeListeners();
   }
 
   /**
@@ -177,44 +141,70 @@ export class Toolbar extends React.Component<IToolbarProps, IToolbarState> {
    * @returns React element
    */
   private _renderTopNav(): React.ReactElement {
+    const activeBranch = this.props.branches.filter(
+      branch => branch.is_current_branch
+    );
+    // FIXME whether the repository as a remote or not should be done through a call to `git remote`
+    const hasRemote = this.props.branches.some(
+      branch => branch.is_remote_branch
+    );
+    const hasUpstream = activeBranch[0]?.upstream !== null;
+
     return (
       <div className={toolbarNavClass}>
-        <button
-          className={classes(toolbarButtonClass, pullButtonClass, 'jp-Icon-16')}
-          title={'Pull latest changes'}
-          onClick={this._onPullClick}
-        />
-        <button
-          className={classes(toolbarButtonClass, pushButtonClass, 'jp-Icon-16')}
-          title={'Push committed changes'}
-          onClick={this._onPushClick}
-        />
-        <button
-          className={classes(
-            toolbarButtonClass,
-            dvcPullButtonClass,
-            'jp-Icon-16'
-          )}
-          title={'Pull DVC files'}
-          onClick={this._onDvcPushClick}
-        />
-        <button
-          className={classes(
-            toolbarButtonClass,
-            dvcPushButtonClass,
-            'jp-Icon-16'
-          )}
-          title={'Push DVC files'}
-          onClick={this._onDvcPushClick}
-        />
-        <button
-          className={classes(
-            toolbarButtonClass,
-            refreshButtonClass,
-            'jp-Icon-16'
-          )}
-          title={'Refresh the repository to detect local and remote changes'}
+        <span className={spacer} />
+        <Badge
+          className={badgeClass}
+          variant="dot"
+          invisible={!hasRemote || this.props.nCommitsBehind === 0}
+          data-test-id="pull-badge"
+        >
+          <ActionButton
+            className={toolbarButtonClass}
+            disabled={!hasRemote}
+            icon={pullIcon}
+            onClick={hasRemote ? this._onPullClick : undefined}
+            title={
+              hasRemote
+                ? 'Pull latest changes' +
+                  (this.props.nCommitsBehind > 0
+                    ? ` (behind by ${this.props.nCommitsBehind} commits)`
+                    : '')
+                : 'No remote repository defined'
+            }
+          />
+        </Badge>
+        <Badge
+          className={badgeClass}
+          variant="dot"
+          invisible={
+            !hasRemote || (this.props.nCommitsAhead === 0 && hasUpstream)
+          }
+          data-test-id="push-badge"
+        >
+          <ActionButton
+            className={toolbarButtonClass}
+            disabled={!hasRemote}
+            icon={pushIcon}
+            onClick={hasRemote ? this._onPushClick : undefined}
+            title={
+              hasRemote
+                ? hasUpstream
+                  ? 'Push committed changes' +
+                    (this.props.nCommitsAhead > 0
+                      ? ` (ahead by ${this.props.nCommitsAhead} commits)`
+                      : '')
+                  : 'Publish branch'
+                : 'No remote repository defined'
+            }
+          />
+        </Badge>
+
+        <ActionButton
+          className={toolbarButtonClass}
+          icon={refreshIcon}
           onClick={this._onRefreshClick}
+          title={'Refresh the repository to detect local and remote changes'}
         />
       </div>
     );
@@ -231,31 +221,16 @@ export class Toolbar extends React.Component<IToolbarProps, IToolbarState> {
         <button
           disabled
           className={toolbarMenuButtonClass}
-          title={`Current repository: ${this.state.repository}`}
-          onClick={this._onRepositoryClick}
+          title={`Current repository: ${this.props.repository}`}
         >
-          <span
-            className={classes(
-              toolbarMenuButtonIconClass,
-              repoIconClass,
-              'jp-Icon-16'
-            )}
-          />
+          <desktopIcon.react className={toolbarMenuButtonIconClass} />
           <div className={toolbarMenuButtonTitleWrapperClass}>
             <p className={toolbarMenuButtonTitleClass}>Current Repository</p>
             <p className={toolbarMenuButtonSubtitleClass}>
-              {PathExt.basename(this.state.repository)}
+              {PathExt.basename(this.props.repository)}
             </p>
           </div>
-          {/*<span
-            className={classes(
-              toolbarMenuButtonIconClass,
-              this.state.repoMenu ? closeMenuIconClass : openMenuIconClass,
-              'jp-Icon-16'
-            )}
-          />*/}
         </button>
-        {this.state.repoMenu ? null : null}
       </div>
     );
   }
@@ -266,7 +241,7 @@ export class Toolbar extends React.Component<IToolbarProps, IToolbarState> {
    * @returns React element
    */
   private _renderBranchMenu(): React.ReactElement | null {
-    if (!this.state.repository) {
+    if (!this.props.model.pathRepository) {
       return null;
     }
     return (
@@ -276,121 +251,108 @@ export class Toolbar extends React.Component<IToolbarProps, IToolbarState> {
             toolbarMenuButtonClass,
             toolbarMenuButtonEnabledClass
           )}
-          title={`Change the current branch: ${this.state.branch}`}
+          title={'Manage branches and tags'}
           onClick={this._onBranchClick}
         >
-          <span
-            className={classes(
-              toolbarMenuButtonIconClass,
-              branchIconClass,
-              'jp-Icon-16'
-            )}
-          />
+          <branchIcon.react className={toolbarMenuButtonIconClass} />
           <div className={toolbarMenuButtonTitleWrapperClass}>
             <p className={toolbarMenuButtonTitleClass}>Current Branch</p>
             <p className={toolbarMenuButtonSubtitleClass}>
-              {this.state.branch}
+              {this.props.currentBranch || ''}
             </p>
           </div>
-          <span
-            className={classes(
-              toolbarMenuButtonIconClass,
-              this.state.branchMenu ? closeMenuIconClass : openMenuIconClass,
-              'jp-Icon-16'
-            )}
-          />
+          {this.state.branchMenu ? (
+            <caretUpIcon.react className={toolbarMenuButtonIconClass} />
+          ) : (
+            <caretDownIcon.react className={toolbarMenuButtonIconClass} />
+          )}
         </button>
-        {this.state.branchMenu ? (
-          <BranchMenu
-            model={this.props.model}
-            branching={this.props.branching}
-          />
-        ) : null}
+        {this.state.branchMenu ? this._renderTabs() : null}
       </div>
     );
   }
 
-  /**
-   * Adds model listeners.
-   */
-  private _addListeners(): void {
-    // When the HEAD changes, decent probability that we've switched branches:
-    this.props.model.headChanged.connect(this._syncState, this);
-
-    // When the status changes, we may have checked out a new branch (e.g., via the command-line and not via the extension) or changed repositories:
-    this.props.model.statusChanged.connect(this._syncState, this);
+  private _renderTabs(): JSX.Element {
+    return (
+      <React.Fragment>
+        <Tabs
+          classes={{
+            root: tabsClass,
+            indicator: tabIndicatorClass
+          }}
+          value={this.state.tab}
+          onChange={(event: any, tab: number): void => {
+            this.setState({
+              tab: tab
+            });
+          }}
+        >
+          <Tab
+            classes={{
+              root: tabClass,
+              selected: selectedTabClass
+            }}
+            title="View branches"
+            label="Branches"
+            disableFocusRipple={true}
+            disableRipple={true}
+          ></Tab>
+          <Tab
+            classes={{
+              root: tabClass,
+              selected: selectedTabClass
+            }}
+            title="View tags"
+            label="Tags"
+            disableFocusRipple={true}
+            disableRipple={true}
+          ></Tab>
+        </Tabs>
+        {this.state.tab === 0 ? this._renderBranches() : this._renderTags()}
+      </React.Fragment>
+    );
   }
 
-  /**
-   * Removes model listeners.
-   */
-  private _removeListeners(): void {
-    this.props.model.headChanged.disconnect(this._syncState, this);
-    this.props.model.statusChanged.disconnect(this._syncState, this);
+  private _renderBranches(): JSX.Element {
+    return (
+      <BranchMenu
+        currentBranch={this.props.currentBranch || ''}
+        branches={this.props.branches}
+        branching={this.props.branching}
+        logger={this.props.logger}
+        model={this.props.model}
+      />
+    );
   }
 
-  /**
-   * Syncs the component state with the underlying model.
-   */
-  private _syncState(): void {
-    const repo = this.props.model.pathRepository;
-    this.setState({
-      repository: repo || '',
-      branch: repo ? this.props.model.currentBranch.name : ''
-    });
+  private _renderTags(): JSX.Element {
+    return (
+      <TagMenu
+        logger={this.props.logger}
+        model={this.props.model}
+        branching={this.props.branching}
+      ></TagMenu>
+    );
   }
 
   /**
    * Callback invoked upon clicking a button to pull the latest changes.
    *
    * @param event - event object
+   * @returns a promise which resolves upon pulling the latest changes
    */
-  private _onPullClick = (): void => {
-    showGitOperationDialog(this.props.model, Operation.Pull).catch(reason => {
-      console.error(
-        `Encountered an error when pulling changes. Error: ${reason}`
-      );
-    });
+  private _onPullClick = async (): Promise<void> => {
+    await this.props.commands.execute(CommandIDs.gitPull);
   };
 
   /**
    * Callback invoked upon clicking a button to push the latest changes.
    *
    * @param event - event object
+   * @returns a promise which resolves upon pushing the latest changes
    */
-  private _onPushClick = (): void => {
-    showGitOperationDialog(this.props.model, Operation.Push).catch(reason => {
-      console.error(
-        `Encountered an error when pushing changes. Error: ${reason}`
-      );
-    });
-  };
-
-  /**
-   * Callback invoked upon clicking a button to push the latest DVC changes.
-   *
-   * @param event - event object
-   */
-  private _onDvcPushClick = (): void => {
-    showGitOperationDialog(this.props.model, Operation.DvcPush).catch(
-      reason => {
-        console.error(
-          `Encountered an error when pushing changes. Error: ${reason}`
-        );
-      }
-    );
-  };
-
-  /**
-   * Callback invoked upon clicking a button to change the current repository.
-   *
-   * @param event - event object
-   */
-  private _onRepositoryClick = (): void => {
-    // Toggle the repository menu:
-    this.setState({
-      repoMenu: !this.state.repoMenu
-    });
+  private _onPushClick = async (): Promise<void> => {
+    await this.props.commands.execute(CommandIDs.gitPush);
   };
 
   /**
@@ -406,11 +368,30 @@ export class Toolbar extends React.Component<IToolbarProps, IToolbarState> {
   };
 
   /**
-   * Callback invoked upon clicking a button to refresh a repository.
+   * Callback invoked upon clicking a button to refresh the model.
    *
    * @param event - event object
+   * @returns a promise which resolves upon refreshing the model
    */
-  private _onRefreshClick = (): void => {
-    this.props.refresh();
+  private _onRefreshClick = async (): Promise<void> => {
+    this.props.logger.log({
+      level: Level.RUNNING,
+      message: 'Refreshing...'
+    });
+    try {
+      await this.props.model.refresh();
+
+      this.props.logger.log({
+        level: Level.SUCCESS,
+        message: 'Successfully refreshed.'
+      });
+    } catch (error) {
+      console.error(error);
+      this.props.logger.log({
+        level: Level.ERROR,
+        message: 'Failed to refresh.',
+        error
+      });
+    }
   };
 }

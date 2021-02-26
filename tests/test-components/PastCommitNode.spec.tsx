@@ -56,7 +56,7 @@ describe('PastCommitNode', () => {
       pre_commit: 'pre_commit'
     },
     branches: branches,
-    renderMime: null
+    commands: null
   };
 
   test('Includes commit info', () => {
@@ -67,7 +67,7 @@ describe('PastCommitNode', () => {
     expect(node.text()).toMatch(props.commit.commit_msg);
   });
 
-  test('Includes only relevent branch info', () => {
+  test('Includes only relevant branch info', () => {
     const node = shallow(<PastCommitNode {...props} />);
     expect(node.text()).toMatch('name3');
     expect(node.text()).toMatch('name4');

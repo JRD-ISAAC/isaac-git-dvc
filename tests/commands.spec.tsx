@@ -1,79 +1,34 @@
+import { JupyterFrontEnd } from '@jupyterlab/application';
+import { showDialog } from '@jupyterlab/apputils';
+import { CommandRegistry } from '@lumino/commands';
 import 'jest';
+import { addCommands, CommandIDs } from '../src/commandsAndMenu';
 import * as git from '../src/git';
 import { GitExtension } from '../src/model';
-import { IGitExtension } from '../src/tokens';
-
-import { CommandIDs, addCommands } from '../src/gitMenuCommands';
-import { CommandRegistry } from '@lumino/commands';
-import { JupyterFrontEnd } from '@jupyterlab/application';
+import { Git } from '../src/tokens';
+import {
+  defaultMockedResponses,
+  IMockedResponses,
+  mockedRequestAPI
+} from './utils';
 
 jest.mock('../src/git');
+jest.mock('@jupyterlab/apputils');
 
 describe('git-commands', () => {
   const mockGit = git as jest.Mocked<typeof git>;
-  const fakeRoot = '/path/to/server';
   let commands: CommandRegistry;
-  let model: IGitExtension;
-  let mockResponses: {
-    [url: string]: {
-      body?: (request: Object) => string;
-      status?: number;
-    };
-  };
+  let model: GitExtension;
+  let mockResponses: IMockedResponses;
 
   beforeEach(async () => {
     jest.restoreAllMocks();
 
     mockResponses = {
-      '/git/branch': {
-        body: request =>
-          JSON.stringify({
-            code: 0,
-            branches: [],
-            current_branch: null
-          })
-      },
-      '/git/show_top_level': {
-        body: request =>
-          JSON.stringify({
-            code: 0,
-            top_repo_path: (request as any)['current_path']
-          })
-      },
-      '/git/server_root': {
-        body: () =>
-          JSON.stringify({
-            server_root: fakeRoot
-          })
-      },
-      '/git/status': {
-        body: () =>
-          JSON.stringify({
-            code: 0,
-            files: []
-          })
-      }
+      ...defaultMockedResponses
     };
 
-    mockGit.httpGitRequest.mockImplementation((url, method, request) => {
-      let response: Response;
-      if (url in mockResponses) {
-        response = new Response(
-          mockResponses[url].body
-            ? mockResponses[url].body(request)
-            : undefined,
-          {
-            status: mockResponses[url].status
-          }
-        );
-      } else {
-        response = new Response(
-          `{"message": "No mock implementation for ${url}."}`,
-          { status: 404 }
-        );
-      }
-      return Promise.resolve(response);
-    });
+    mockGit.requestAPI.mockImplementation(mockedRequestAPI(mockResponses));
 
     commands = new CommandRegistry();
     const app = {
@@ -81,7 +36,7 @@ describe('git-commands', () => {
       shell: null as any
     };
     model = new GitExtension(app as any);
-    addCommands(app as JupyterFrontEnd, model, null, null);
+    addCommands(app as JupyterFrontEnd, model, null, null, null);
   });
 
   describe('git:add-remote', () => {
@@ -90,19 +45,23 @@ describe('git-commands', () => {
       const url = 'https://www.mygitserver.com/me/myrepo.git';
       const path = '/path/to/repo';
 
-      mockResponses = {
-        ...mockResponses,
-        '/git/remote/add': {
-          body: () => `{"code": 0, "command": "git remote add ${name} ${url}"}`
-        }
-      };
+      mockGit.requestAPI.mockImplementation(
+        mockedRequestAPI({
+          ...mockResponses,
+          'remote/add': {
+            body: () => {
+              return { code: 0, command: `git remote add ${name} ${url}` };
+            }
+          }
+        })
+      );
 
       model.pathRepository = path;
       await model.ready;
 
       await commands.execute(CommandIDs.gitAddRemote, { url, name });
 
-      expect(mockGit.httpGitRequest).toBeCalledWith('/git/remote/add', 'POST', {
+      expect(mockGit.requestAPI).toBeCalledWith('remote/add', 'POST', {
         top_repo_path: path,
         url,
         name
@@ -114,21 +73,84 @@ describe('git-commands', () => {
       const url = 'https://www.mygitserver.com/me/myrepo.git';
       const path = '/path/to/repo';
 
-      mockResponses = {
-        ...mockResponses,
-        '/git/remote/add': {
-          body: () => `{"code": 0, "command": "git remote add ${name} ${url}"}`
-        }
-      };
+      mockGit.requestAPI.mockImplementation(
+        mockedRequestAPI({
+          ...mockResponses,
+          'remote/add': {
+            body: () => {
+              return { code: 0, command: `git remote add ${name} ${url}` };
+            }
+          }
+        })
+      );
 
       model.pathRepository = path;
       await model.ready;
 
       await commands.execute(CommandIDs.gitAddRemote, { url });
 
-      expect(mockGit.httpGitRequest).toBeCalledWith('/git/remote/add', 'POST', {
+      expect(mockGit.requestAPI).toBeCalledWith('remote/add', 'POST', {
         top_repo_path: path,
         url
+      });
+    });
+  });
+
+  describe('git:context-discard', () => {
+    ['staged', 'partially-staged', 'unstaged', 'untracked'].forEach(status => {
+      [' ', 'M', 'A'].forEach(x => {
+        it(`status:${status} - x:${x} may reset and/or checkout`, async () => {
+          const mockDialog = showDialog as jest.MockedFunction<
+            typeof showDialog
+          >;
+          mockDialog.mockResolvedValue({
+            button: {
+              accept: true,
+              actions: [],
+              caption: '',
+              className: '',
+              displayType: 'default',
+              iconClass: '',
+              iconLabel: '',
+              label: ''
+            },
+            value: undefined
+          });
+          const spyReset = jest.spyOn(model, 'reset');
+          spyReset.mockResolvedValueOnce(undefined);
+          const spyCheckout = jest.spyOn(model, 'checkout');
+          spyCheckout.mockResolvedValueOnce(undefined);
+
+          const path = 'file/path.ext';
+          model.pathRepository = '/path/to/repo';
+          await model.ready;
+
+          await commands.execute(CommandIDs.gitFileDiscard, {
+            x,
+            y: ' ',
+            from: 'from',
+            to: path,
+            status: status as Git.Status,
+            is_binary: false
+          });
+
+          if (status === 'staged' || status === 'partially-staged') {
+            expect(spyReset).toHaveBeenCalledWith(path);
+          } else if (status === 'unstaged') {
+            expect(spyReset).not.toHaveBeenCalled();
+            expect(spyCheckout).toHaveBeenCalledWith({ filename: path });
+          } else if (status === 'partially-staged') {
+            expect(spyReset).toHaveBeenCalledWith(path);
+            if (x !== 'A') {
+              expect(spyCheckout).toHaveBeenCalledWith({ filename: path });
+            } else {
+              expect(spyCheckout).not.toHaveBeenCalled();
+            }
+          }
+
+          spyReset.mockRestore();
+          spyCheckout.mockRestore();
+        });
       });
     });
   });

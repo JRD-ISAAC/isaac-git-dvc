@@ -1,7 +1,7 @@
 import { style } from 'typestyle';
 
 export const branchDialogClass = style({
-  height: '460px',
+  minHeight: '460px',
   width: '400px',
 
   color: 'var(--jp-ui-font-color1)!important',
@@ -73,7 +73,7 @@ export const nameInputClass = style({
   /* top | right | bottom | left */
   padding: '1px 18px 2px 7px',
 
-  color: 'var(--jp-ui-font-color0)',
+  color: 'var(--jp-ui-font-color1)',
   fontSize: 'var(--jp-ui-font-size1)',
   fontWeight: 300,
 
@@ -118,7 +118,7 @@ export const filterInputClass = style({
   /* top | right | bottom | left */
   padding: '1px 18px 2px 7px',
 
-  color: 'var(--jp-ui-font-color0)',
+  color: 'var(--jp-ui-font-color1)',
   fontSize: 'var(--jp-ui-font-size1)',
   fontWeight: 300,
 
@@ -171,15 +171,10 @@ export const filterClearClass = style({
 export const listWrapperClass = style({
   boxSizing: 'border-box',
   display: 'block',
-
-  width: '100%',
-  height: '200px',
-
   border: 'var(--jp-border-width) solid var(--jp-border-color2)',
   borderRadius: '3px',
-
-  overflow: 'hidden',
-  overflowY: 'scroll'
+  paddingTop: 0,
+  paddingBottom: 0
 });
 
 export const listItemClass = style({
@@ -198,7 +193,13 @@ export const listItemClass = style({
 export const activeListItemClass = style({
   color: 'white!important',
 
-  backgroundColor: 'var(--jp-brand-color1)!important'
+  backgroundColor: 'var(--jp-brand-color1)!important',
+
+  $nest: {
+    '& .jp-icon-selectable[fill]': {
+      fill: 'white'
+    }
+  }
 });
 
 export const listItemContentClass = style({
@@ -219,18 +220,17 @@ export const listItemIconClass = style({
   height: '16px',
 
   /* top | right | bottom | left */
-  margin: 'auto 8px auto 0',
-
-  backgroundImage: 'var(--jp-icon-git-branch)',
-  backgroundSize: '16px',
-  backgroundRepeat: 'no-repeat',
-  backgroundPosition: 'center'
+  margin: 'auto 8px auto 0'
 });
 
 export const listItemTitleClass = style({});
 
 export const listItemBoldTitleClass = style({
   fontWeight: 700
+});
+
+export const errorMessageClass = style({
+  color: '#ff0000'
 });
 
 export const actionsWrapperClass = style({
@@ -253,9 +253,38 @@ export const buttonClass = style({
 });
 
 export const cancelButtonClass = style({
-  backgroundColor: '#757575'
+  backgroundColor: 'var(--md-grey-500)',
+
+  $nest: {
+    '&:hover': {
+      backgroundColor: 'var(--md-grey-600)'
+    },
+    '&:active': {
+      backgroundColor: 'var(--md-grey-700)'
+    }
+  }
 });
 
 export const createButtonClass = style({
-  backgroundColor: 'var(--jp-brand-color1)'
+  backgroundColor: 'var(--md-blue-500)',
+
+  $nest: {
+    '&:hover': {
+      backgroundColor: 'var(--md-blue-600)'
+    },
+    '&:active': {
+      backgroundColor: 'var(--md-blue-700)'
+    },
+    '&:disabled': {
+      cursor: 'default',
+      color: 'var(--jp-ui-inverse-font-color0)',
+      backgroundColor: 'var(--jp-layout-color3)'
+    },
+    '&:disabled:hover': {
+      backgroundColor: 'var(--jp-layout-color3)'
+    },
+    '&:disabled:active': {
+      backgroundColor: 'var(--jp-layout-color3)'
+    }
+  }
 });

@@ -1,4 +1,4 @@
-import os
+from pathlib import Path
 from unittest.mock import Mock, call, patch
 
 import pytest
@@ -14,20 +14,21 @@ async def test_git_clone_success():
     with patch("os.environ", {"TEST": "test"}):
         with patch("jupyterlab_git.git.execute") as mock_execute:
             # Given
-            mock_execute.return_value = maybe_future((0, "output", "error"))
+            output = "output"
+            mock_execute.return_value = maybe_future((0, output, "error"))
 
             # When
-            actual_response = await Git(FakeContentManager("/bin")).clone(
+            actual_response = await Git(FakeContentManager(Path("/bin"))).clone(
                 current_path="test_curr_path", repo_url="ghjkhjkl"
             )
 
             # Then
             mock_execute.assert_called_once_with(
                 ["git", "clone", "ghjkhjkl"],
-                cwd=os.path.join("/bin", "test_curr_path"),
+                cwd=str(Path("/bin") / "test_curr_path"),
                 env={"TEST": "test", "GIT_TERMINAL_PROMPT": "0"},
             )
-            assert {"code": 0} == actual_response
+            assert {"code": 0, "message": output} == actual_response
 
 
 @pytest.mark.asyncio
@@ -45,14 +46,14 @@ async def test_git_clone_failure_from_git():
             )
 
             # When
-            actual_response = await Git(FakeContentManager("/bin")).clone(
+            actual_response = await Git(FakeContentManager(Path("/bin"))).clone(
                 current_path="test_curr_path", repo_url="ghjkhjkl"
             )
 
             # Then
             mock_execute.assert_called_once_with(
                 ["git", "clone", "ghjkhjkl"],
-                cwd=os.path.join("/bin", "test_curr_path"),
+                cwd=str(Path("/bin") / "test_curr_path"),
                 env={"TEST": "test", "GIT_TERMINAL_PROMPT": "0"},
             )
             assert {
@@ -66,11 +67,12 @@ async def test_git_clone_with_auth_success():
     with patch("os.environ", {"TEST": "test"}):
         with patch("jupyterlab_git.git.execute") as mock_authentication:
             # Given
-            mock_authentication.return_value = maybe_future((0, "", ""))
+            output = "output"
+            mock_authentication.return_value = maybe_future((0, output, ""))
 
             # When
             auth = {"username": "asdf", "password": "qwerty"}
-            actual_response = await Git(FakeContentManager("/bin")).clone(
+            actual_response = await Git(FakeContentManager(Path("/bin"))).clone(
                 current_path="test_curr_path", repo_url="ghjkhjkl", auth=auth
             )
 
@@ -79,10 +81,10 @@ async def test_git_clone_with_auth_success():
                 ["git", "clone", "ghjkhjkl", "-q"],
                 username="asdf",
                 password="qwerty",
-                cwd=os.path.join("/bin", "test_curr_path"),
+                cwd=str(Path("/bin") / "test_curr_path"),
                 env={"TEST": "test", "GIT_TERMINAL_PROMPT": "1"},
             )
-            assert {"code": 0} == actual_response
+            assert {"code": 0, "message": output} == actual_response
 
 
 @pytest.mark.asyncio
@@ -101,7 +103,7 @@ async def test_git_clone_with_auth_wrong_repo_url_failure_from_git():
 
             # When
             auth = {"username": "asdf", "password": "qwerty"}
-            actual_response = await Git(FakeContentManager("/bin")).clone(
+            actual_response = await Git(FakeContentManager(Path("/bin"))).clone(
                 current_path="test_curr_path", repo_url="ghjkhjkl", auth=auth
             )
 
@@ -110,7 +112,7 @@ async def test_git_clone_with_auth_wrong_repo_url_failure_from_git():
                 ["git", "clone", "ghjkhjkl", "-q"],
                 username="asdf",
                 password="qwerty",
-                cwd=os.path.join("/bin", "test_curr_path"),
+                cwd=str(Path("/bin") / "test_curr_path"),
                 env={"TEST": "test", "GIT_TERMINAL_PROMPT": "1"},
             )
             assert {
@@ -139,7 +141,7 @@ async def test_git_clone_with_auth_auth_failure_from_git():
 
             # When
             auth = {"username": "asdf", "password": "qwerty"}
-            actual_response = await Git(FakeContentManager("/bin")).clone(
+            actual_response = await Git(FakeContentManager(Path("/bin"))).clone(
                 current_path="test_curr_path", repo_url="ghjkhjkl", auth=auth
             )
 
@@ -148,7 +150,7 @@ async def test_git_clone_with_auth_auth_failure_from_git():
                 ["git", "clone", "ghjkhjkl", "-q"],
                 username="asdf",
                 password="qwerty",
-                cwd=os.path.join("/bin", "test_curr_path"),
+                cwd=str(Path("/bin") / "test_curr_path"),
                 env={"TEST": "test", "GIT_TERMINAL_PROMPT": "1"},
             )
             assert {

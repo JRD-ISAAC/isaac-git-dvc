@@ -1,40 +1,119 @@
-import * as React from 'react';
-import { classes } from 'typestyle';
+import { Dialog, showDialog, showErrorMessage } from '@jupyterlab/apputils';
 import List from '@material-ui/core/List';
 import ListItem from '@material-ui/core/ListItem';
 import ClearIcon from '@material-ui/icons/Clear';
-import { showErrorMessage } from '@jupyterlab/apputils';
-import { Git, IGitExtension } from '../tokens';
+import * as React from 'react';
+import { FixedSizeList, ListChildComponentProps } from 'react-window';
+import { classes } from 'typestyle';
+import { Logger } from '../logger';
+import { hiddenButtonStyle } from '../style/ActionButtonStyle';
 import {
   activeListItemClass,
+  nameClass,
   filterClass,
   filterClearClass,
   filterInputClass,
   filterWrapperClass,
   listItemClass,
   listItemIconClass,
-  listWrapperClass,
   newBranchButtonClass,
   wrapperClass
 } from '../style/BranchMenu';
+import { branchIcon, trashIcon } from '../style/icons';
+import { Git, IGitExtension, Level } from '../tokens';
+import { ActionButton } from './ActionButton';
 import { NewBranchDialog } from './NewBranchDialog';
 
 const CHANGES_ERR_MSG =
   'The current branch contains files with uncommitted changes. Please commit or discard these changes before switching to or creating another branch.';
+const ITEM_HEIGHT = 24.8; // HTML element height for a single branch
+const MIN_HEIGHT = 150; // Minimal HTML element height for the branches list
+const MAX_HEIGHT = 400; // Maximal HTML element height for the branches list
+
+/**
+ * Callback invoked upon encountering an error when switching branches.
+ *
+ * @private
+ * @param error - error
+ * @param logger - the logger
+ */
+function onBranchError(error: any, logger: Logger): void {
+  if (error.message.includes('following files would be overwritten')) {
+    // Empty log message to hide the executing alert
+    logger.log({
+      message: '',
+      level: Level.INFO
+    });
+    showDialog({
+      title: 'Unable to switch branch',
+      body: (
+        <React.Fragment>
+          <p>
+            Your changes to the following files would be overwritten by
+            switching:
+          </p>
+          <List>
+            {error.message
+              .split('\n')
+              .slice(1, -3)
+              .map(renderFileName)}
+          </List>
+          <span>
+            Please commit, stash, or discard your changes before you switch
+            branches.
+          </span>
+        </React.Fragment>
+      ),
+      buttons: [Dialog.okButton({ label: 'Dismiss' })]
+    });
+  } else {
+    logger.log({
+      level: Level.ERROR,
+      message: 'Failed to switch branch.',
+      error
+    });
+  }
+}
+
+/**
+ * Renders a file name.
+ *
+ * @private
+ * @param filename - file name
+ * @returns React element
+ */
+function renderFileName(filename: string): React.ReactElement {
+  return <ListItem key={filename}>{filename}</ListItem>;
+}
 
 /**
  * Interface describing component properties.
  */
 export interface IBranchMenuProps {
   /**
-   * Git extension data model.
+   * Current branch name.
    */
-  model: IGitExtension;
+  currentBranch: string;
+
+  /**
+   * Current list of branches.
+   */
+  branches: Git.IBranch[];
 
   /**
    * Boolean indicating whether branching is disabled.
    */
   branching: boolean;
+
+  /**
+   * Extension logger
+   */
+  logger: Logger;
+
+  /**
+   * Git extension data model.
+   */
+  model: IGitExtension;
 }
 
 /**
@@ -42,24 +121,14 @@ export interface IBranchMenuProps {
  */
 export interface IBranchMenuState {
   /**
-   * Menu filter.
-   */
-  filter: string;
-
-  /**
    * Boolean indicating whether to show a dialog to create a new branch.
    */
   branchDialog: boolean;
 
   /**
-   * Current branch name.
+   * Menu filter.
    */
-  current: string;
-
-  /**
-   * Current list of branches.
-   */
-  branches: Git.IBranch[];
+  filter: string;
 }
 
 /**
@@ -78,28 +147,10 @@ export class BranchMenu extends React.Component<
   constructor(props: IBranchMenuProps) {
     super(props);
 
-    const repo = this.props.model.pathRepository;
-
     this.state = {
       filter: '',
-      branchDialog: false,
-      current: repo ? this.props.model.currentBranch.name : '',
-      branches: repo ? this.props.model.branches : []
+      branchDialog: false
     };
-  }
-
-  /**
-   * Callback invoked immediately after mounting a component (i.e., inserting into a tree).
-   */
-  componentDidMount(): void {
-    this._addListeners();
-  }
-
-  /**
-   * Callback invoked when a component will no longer be mounted.
-   */
-  componentWillUnmount(): void {
-    this._removeListeners();
   }
 
   /**
@@ -110,115 +161,134 @@ export class BranchMenu extends React.Component<
   render(): React.ReactElement {
     return (
       <div className={wrapperClass}>
-        <div className={filterWrapperClass}>
-          <div className={filterClass}>
-            <input
-              className={filterInputClass}
-              type="text"
-              onChange={this._onFilterChange}
-              value={this.state.filter}
-              placeholder="Filter"
-              title="Filter branch menu"
-            />
-            {this.state.filter ? (
-              <button className={filterClearClass}>
-                <ClearIcon
-                  titleAccess="Clear the current filter"
-                  fontSize="small"
-                  onClick={this._resetFilter}
-                />
-              </button>
-            ) : null}
-          </div>
+        {this._renderFilter()}
+        {this._renderBranchList()}
+        {this._renderNewBranchDialog()}
+      </div>
+    );
+  }
+
+  /**
+   * Renders a branch input filter.
+   *
+   * @returns React element
+   */
+  private _renderFilter(): React.ReactElement {
+    return (
+      <div className={filterWrapperClass}>
+        <div className={filterClass}>
           <input
-            className={newBranchButtonClass}
-            type="button"
-            title="Create a new branch"
-            value="New Branch"
-            onClick={this._onNewBranchClick}
+            className={filterInputClass}
+            type="text"
+            onChange={this._onFilterChange}
+            value={this.state.filter}
+            placeholder="Filter"
+            title="Filter branch menu"
           />
+          {this.state.filter ? (
+            <button className={filterClearClass}>
+              <ClearIcon
+                titleAccess="Clear the current filter"
+                fontSize="small"
+                onClick={this._resetFilter}
+              />
+            </button>
+          ) : null}
         </div>
-        <div className={listWrapperClass}>
-          <List disablePadding>{this._renderItems()}</List>
-        </div>
-        <NewBranchDialog
-          open={this.state.branchDialog}
-          model={this.props.model}
-          onClose={this._onNewBranchDialogClose}
+        <input
+          className={newBranchButtonClass}
+          type="button"
+          title="Create a new branch"
+          value="New Branch"
+          onClick={this._onNewBranchClick}
         />
       </div>
     );
   }
 
   /**
-   * Renders menu items.
+   * Renders a
    *
-   * @returns array of React elements
+   * @returns React element
    */
-  private _renderItems(): React.ReactElement[] {
-    return this.state.branches.map(this._renderItem, this);
+  private _renderBranchList(): React.ReactElement {
+    // Perform a "simple" filter... (TODO: consider implementing fuzzy filtering)
+    const filter = this.state.filter;
+    const branches = this.props.branches.filter(
+      branch => !filter || branch.name.includes(filter)
+    );
+    return (
+      <FixedSizeList
+        height={Math.min(
+          Math.max(MIN_HEIGHT, branches.length * ITEM_HEIGHT),
+          MAX_HEIGHT
+        )}
+        itemCount={branches.length}
+        itemData={branches}
+        itemKey={(index, data) => data[index].name}
+        itemSize={ITEM_HEIGHT}
+        style={{ overflowX: 'hidden', paddingTop: 0, paddingBottom: 0 }}
+        width={'auto'}
+      >
+        {this._renderItem}
+      </FixedSizeList>
+    );
   }
 
   /**
    * Renders a menu item.
    *
-   * @param branch - branch
-   * @param idx - item index
+   * @param props Row properties
    * @returns React element
    */
-  private _renderItem(
-    branch: Git.IBranch,
-    idx: number
-  ): React.ReactElement | null {
-    // Perform a "simple" filter... (TODO: consider implementing fuzzy filtering)
-    if (this.state.filter && !branch.name.includes(this.state.filter)) {
-      return null;
-    }
+  private _renderItem = (props: ListChildComponentProps): JSX.Element => {
+    const { data, index, style } = props;
+    const branch = data[index] as Git.IBranch;
+    const isActive = branch.name === this.props.currentBranch;
     return (
       <ListItem
         button
         title={`Switch to branch: ${branch.name}`}
         className={classes(
           listItemClass,
-          branch.name === this.state.current ? activeListItemClass : null
+          isActive ? activeListItemClass : null
         )}
-        key={branch.name}
         onClick={this._onBranchClickFactory(branch.name)}
+        style={style}
       >
-        <span className={listItemIconClass} />
-        {branch.name}
+        <branchIcon.react className={listItemIconClass} tag="span" />
+        <span className={nameClass}>{branch.name}</span>
+        {!branch.is_remote_branch && !isActive && (
+          <ActionButton
+            className={hiddenButtonStyle}
+            icon={trashIcon}
+            title={'Delete this branch locally'}
+            onClick={(event: React.MouseEvent) => {
+              event.stopPropagation();
+              this._onDeleteBranch(branch.name);
+            }}
+          />
+        )}
       </ListItem>
     );
-  }
+  };
 
   /**
-   * Adds model listeners.
+   * Renders a dialog for creating a new branch.
+   *
+   * @returns React element
    */
-  private _addListeners(): void {
-    // When the HEAD changes, decent probability that we've switched branches:
-    this.props.model.headChanged.connect(this._syncState, this);
-
-    // When the status changes, we may have checked out a new branch (e.g., via the command-line and not via the extension) or changed repositories:
-    this.props.model.statusChanged.connect(this._syncState, this);
-  }
-
-  /**
-   * Removes model listeners.
-   */
-  private _removeListeners(): void {
-    this.props.model.headChanged.disconnect(this._syncState, this);
-    this.props.model.statusChanged.disconnect(this._syncState, this);
-  }
-
-  /**
-   * Syncs the component state with the underlying model.
-   */
-  private _syncState(): void {
-    const repo = this.props.model.pathRepository;
-    this.setState({
-      current: repo ? this.props.model.currentBranch.name : '',
-      branches: repo ? this.props.model.branches : []
-    });
+  private _renderNewBranchDialog(): React.ReactElement {
+    return (
+      <NewBranchDialog
+        currentBranch={this.props.currentBranch}
+        branches={this.props.branches}
+        logger={this.props.logger}
+        open={this.state.branchDialog}
+        model={this.props.model}
+        onClose={this._onNewBranchDialogClose}
+      />
+    );
   }
 
   /**
@@ -239,6 +309,34 @@ export class BranchMenu extends React.Component<
     this.setState({
       filter: ''
     });
+  };
+
+  /**
+   * Callback on delete branch name button
+   *
+   * @param branchName Branch name
+   */
+  private _onDeleteBranch = async (branchName: string): Promise<void> => {
+    const acknowledgement = await showDialog<void>({
+      title: 'Delete branch',
+      body: (
+        <p>
+          Are you sure you want to permanently delete the branch{' '}
+          <b>{branchName}</b>?
+          <br />
+          This action cannot be undone.
+        </p>
+      ),
+      buttons: [Dialog.cancelButton(), Dialog.warnButton({ label: 'Delete' })]
+    });
+    if (acknowledgement.button.accept) {
+      try {
+        await this.props.model.deleteBranch(branchName);
+        await this.props.model.refreshBranch();
+      } catch (error) {
+        console.error(`Failed to delete branch ${branchName}`, error);
+      }
+    }
   };
 
   /**
@@ -280,8 +378,9 @@ export class BranchMenu extends React.Component<
      *
      * @private
      * @param event - event object
+     * @returns promise which resolves upon attempting to switch branches
      */
-    function onClick(): void {
+    async function onClick(): Promise<void> {
       if (!self.props.branching) {
         showErrorMessage('Switching branches is disabled', CHANGES_ERR_MSG);
         return;
@@ -289,32 +388,22 @@ export class BranchMenu extends React.Component<
       const opts = {
         branchname: branch
       };
-      self.props.model
-        .checkout(opts)
-        .then(onResolve)
-        .catch(onError);
-    }
 
-    /**
-     * Callback invoked upon promise resolution.
-     *
-     * @private
-     * @param result - result
-     */
-    function onResolve(result: any): void {
-      if (result.code !== 0) {
-        showErrorMessage('Error switching branch', result.message);
+      self.props.logger.log({
+        level: Level.RUNNING,
+        message: 'Switching branch...'
+      });
+
+      try {
+        await self.props.model.checkout(opts);
+      } catch (err) {
+        return onBranchError(err, self.props.logger);
       }
-    }
 
-    /**
-     * Callback invoked upon encountering an error.
-     *
-     * @private
-     * @param err - error
-     */
-    function onError(err: any): void {
-      showErrorMessage('Error switching branch', err.message);
+      self.props.logger.log({
+        level: Level.SUCCESS,
+        message: 'Switched branch.'
+      });
     }
   }
 }

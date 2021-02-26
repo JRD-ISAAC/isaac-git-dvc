@@ -21,7 +21,7 @@ describe('HistorySideBar', () => {
     ],
     branches: [],
     model: null,
-    renderMime: null
+    commands: null
   };
   test('renders commit nodes', () => {
     const historySideBar = shallow(<HistorySideBar {...props} />);

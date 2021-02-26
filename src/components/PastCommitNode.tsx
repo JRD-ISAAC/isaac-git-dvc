@@ -1,23 +1,22 @@
+import { caretDownIcon, caretUpIcon } from '@jupyterlab/ui-components';
+import { CommandRegistry } from '@lumino/commands';
 import * as React from 'react';
 import { classes } from 'typestyle';
-import { IRenderMimeRegistry } from '@jupyterlab/rendermime';
 import { GitExtension } from '../model';
-import { Git } from '../tokens';
 import {
-  branchWrapperClass,
   branchClass,
-  collapseIconButtonClass,
+  branchWrapperClass,
   commitBodyClass,
   commitExpandedClass,
   commitHeaderClass,
   commitHeaderItemClass,
   commitWrapperClass,
-  expandIconButtonClass,
   iconButtonClass,
   localBranchClass,
   remoteBranchClass,
   workingBranchClass
 } from '../style/PastCommitNode';
+import { Git } from '../tokens';
 import { SinglePastCommitInfo } from './SinglePastCommitInfo';
 
 /**
@@ -40,9 +39,9 @@ export interface IPastCommitNodeProps {
   model: GitExtension;
 
   /**
-   * Render MIME type registry.
+   * Jupyter App commands registry
    */
-  renderMime: IRenderMimeRegistry;
+  commands: CommandRegistry;
 }
 
 /**
@@ -99,15 +98,11 @@ export class PastCommitNode extends React.Component<
           <span className={commitHeaderItemClass}>
             {this.props.commit.date}
           </span>
-          <span
-            className={classes(
-              iconButtonClass,
-              this.state.expanded
-                ? collapseIconButtonClass
-                : expandIconButtonClass,
-              'jp-Icon-16'
-            )}
-          />
+          {this.state.expanded ? (
+            <caretUpIcon.react className={iconButtonClass} tag="span" />
+          ) : (
+            <caretDownIcon.react className={iconButtonClass} tag="span" />
+          )}
         </div>
         <div className={branchWrapperClass}>{this._renderBranches()}</div>
         <div className={commitBodyClass}>
@@ -116,7 +111,7 @@ export class PastCommitNode extends React.Component<
             <SinglePastCommitInfo
               commit={this.props.commit}
               model={this.props.model}
-              renderMime={this.props.renderMime}
+              commands={this.props.commands}
             />
           )}
         </div>

@@ -1,5 +1,5 @@
 # python lib
-import os
+from pathlib import Path
 from unittest.mock import Mock, call, patch
 
 import pytest
@@ -11,8 +11,9 @@ from jupyterlab_git.git import Git
 from .testutils import FakeContentManager, maybe_future
 
 
-def test_is_remote_branch():
-    test_cases = [
+@pytest.mark.parametrize(
+    "branch,expected",
+    [
         ("refs/heads/feature-foo", False),
         ("refs/heads/master", False),
         ("refs/remotes/origin/feature-foo", True),
@@ -20,12 +21,11 @@ def test_is_remote_branch():
         ("refs/stash", False),
         ("refs/tags/v0.1.0", False),
         ("refs/tags/blah@0.2.0", False),
-    ]
-    for test_case in test_cases:
-        actual_response = Git(FakeContentManager("/bin"))._is_remote_branch(
-            test_case[0]
-        )
-        assert test_case[1] == actual_response
+    ],
+)
+def test_is_remote_branch(branch, expected):
+    actual_response = Git(FakeContentManager(Path("/bin")))._is_remote_branch(branch)
+    assert expected == actual_response
 
 
 @pytest.mark.asyncio
@@ -37,14 +37,15 @@ async def test_get_current_branch_success():
 
         # When
         actual_response = await (
-            Git(FakeContentManager("/bin")).get_current_branch(
+            Git(FakeContentManager(Path("/bin"))).get_current_branch(
                 current_path="test_curr_path"
             )
         )
 
         # Then
         mock_execute.assert_called_once_with(
-            ["git", "symbolic-ref", "HEAD"], cwd=os.path.join("/bin", "test_curr_path")
+            ["git", "symbolic-ref", "--short", "HEAD"],
+            cwd=str(Path("/bin") / "test_curr_path"),
         )
         assert "feature-foo" == actual_response
 
@@ -67,16 +68,17 @@ async def test_checkout_branch_noref_success():
             )
 
             # When
-            actual_response = await Git(FakeContentManager("/bin")).checkout_branch(
-                branchname=branch, current_path=curr_path
-            )
+            actual_response = await Git(
+                FakeContentManager(Path("/bin"))
+            ).checkout_branch(branchname=branch, current_path=curr_path)
 
             # Then
             mock__get_branch_reference.assert_has_calls([call(branch, curr_path)])
 
             cmd = ["git", "checkout", branch]
             mock_execute.assert_called_once_with(
-                cmd, cwd=os.path.join("/bin", "test_curr_path")
+                cmd,
+                cwd=str(Path("/bin") / "test_curr_path"),
             )
 
             assert {"code": rc, "message": stdout_message} == actual_response
@@ -87,8 +89,8 @@ async def test_checkout_branch_noref_failure():
     branch = "test-branch"
     curr_path = "test_curr_path"
     stdout_message = ""
-    stderr_message = "error: pathspec '{}' did not match any file(s) known to git".format(
-        branch
+    stderr_message = (
+        "error: pathspec '{}' did not match any file(s) known to git".format(branch)
     )
     rc = 1
     with patch("jupyterlab_git.git.execute") as mock_execute:
@@ -101,16 +103,17 @@ async def test_checkout_branch_noref_failure():
             )
 
             # When
-            actual_response = await Git(FakeContentManager("/bin")).checkout_branch(
-                branchname=branch, current_path=curr_path
-            )
+            actual_response = await Git(
+                FakeContentManager(Path("/bin"))
+            ).checkout_branch(branchname=branch, current_path=curr_path)
 
             # Then
             mock__get_branch_reference.assert_has_calls([call(branch, curr_path)])
 
             cmd = ["git", "checkout", branch]
             mock_execute.assert_called_once_with(
-                cmd, cwd=os.path.join("/bin", "test_curr_path")
+                cmd,
+                cwd=str(Path("/bin") / "test_curr_path"),
             )
 
             assert {
@@ -140,16 +143,17 @@ async def test_checkout_branch_remoteref_success():
             )
 
             # When
-            actual_response = await Git(FakeContentManager("/bin")).checkout_branch(
-                branchname=branch, current_path=curr_path
-            )
+            actual_response = await Git(
+                FakeContentManager(Path("/bin"))
+            ).checkout_branch(branchname=branch, current_path=curr_path)
 
             # Then
             mock__get_branch_reference.assert_has_calls([call(branch, curr_path)])
 
             cmd = ["git", "checkout", "--track", branch]
             mock_execute.assert_called_once_with(
-                cmd, cwd=os.path.join("/bin", "test_curr_path")
+                cmd,
+                cwd=str(Path("/bin") / "test_curr_path"),
             )
 
             assert {"code": rc, "message": stdout_message} == actual_response
@@ -160,8 +164,8 @@ async def test_checkout_branch_headsref_failure():
     branch = "test-branch"
     curr_path = "test_curr_path"
     stdout_message = ""
-    stderr_message = "error: pathspec '{}' did not match any file(s) known to git".format(
-        branch
+    stderr_message = (
+        "error: pathspec '{}' did not match any file(s) known to git".format(branch)
     )
     rc = 1
 
@@ -177,16 +181,17 @@ async def test_checkout_branch_headsref_failure():
             )
 
             # When
-            actual_response = await Git(FakeContentManager("/bin")).checkout_branch(
-                branchname=branch, current_path=curr_path
-            )
+            actual_response = await Git(
+                FakeContentManager(Path("/bin"))
+            ).checkout_branch(branchname=branch, current_path=curr_path)
 
             # Then
             mock__get_branch_reference.assert_has_calls([call(branch, curr_path)])
 
             cmd = ["git", "checkout", branch]
             mock_execute.assert_called_once_with(
-                cmd, cwd=os.path.join("/bin", "test_curr_path")
+                cmd,
+                cwd=str(Path("/bin") / "test_curr_path"),
             )
             assert {
                 "code": rc,
@@ -214,14 +219,15 @@ async def test_checkout_branch_headsref_success():
             )
 
             # When
-            actual_response = await Git(FakeContentManager("/bin")).checkout_branch(
-                branchname=branch, current_path="test_curr_path"
-            )
+            actual_response = await Git(
+                FakeContentManager(Path("/bin"))
+            ).checkout_branch(branchname=branch, current_path="test_curr_path")
 
             # Then
             cmd = ["git", "checkout", branch]
             mock_execute.assert_called_once_with(
-                cmd, cwd=os.path.join("/bin", "test_curr_path")
+                cmd,
+                cwd=str(Path("/bin") / "test_curr_path"),
             )
             assert {"code": rc, "message": stdout_message} == actual_response
 
@@ -230,8 +236,8 @@ async def test_checkout_branch_headsref_success():
 async def test_checkout_branch_remoteref_failure():
     branch = "test-branch"
     stdout_message = ""
-    stderr_message = "error: pathspec '{}' did not match any file(s) known to git".format(
-        branch
+    stderr_message = (
+        "error: pathspec '{}' did not match any file(s) known to git".format(branch)
     )
     rc = 1
 
@@ -247,14 +253,15 @@ async def test_checkout_branch_remoteref_failure():
             )
 
             # When
-            actual_response = await Git(FakeContentManager("/bin")).checkout_branch(
-                branchname=branch, current_path="test_curr_path"
-            )
+            actual_response = await Git(
+                FakeContentManager(Path("/bin"))
+            ).checkout_branch(branchname=branch, current_path="test_curr_path")
 
             # Then
             cmd = ["git", "checkout", "--track", branch]
             mock_execute.assert_called_once_with(
-                cmd, cwd=os.path.join("/bin", "test_curr_path")
+                cmd,
+                cwd=str(Path("/bin") / "test_curr_path"),
             )
             assert {
                 "code": rc,
@@ -275,14 +282,14 @@ async def test_get_branch_reference_success():
         mock_execute.return_value = maybe_future((0, reference, ""))
 
         # When
-        actual_response = await Git(FakeContentManager("/bin"))._get_branch_reference(
-            branchname=branch, current_path="test_curr_path"
-        )
+        actual_response = await Git(
+            FakeContentManager(Path("/bin"))
+        )._get_branch_reference(branchname=branch, current_path="test_curr_path")
 
         # Then
         mock_execute.assert_called_once_with(
             ["git", "rev-parse", "--symbolic-full-name", branch],
-            cwd=os.path.join("/bin", "test_curr_path"),
+            cwd=str(Path("/bin") / "test_curr_path"),
         )
         assert actual_response == reference
 
@@ -305,14 +312,14 @@ async def test_get_branch_reference_failure():
         )
 
         # When
-        actual_response = await Git(FakeContentManager("/bin"))._get_branch_reference(
-            branchname=branch, current_path="test_curr_path"
-        )
+        actual_response = await Git(
+            FakeContentManager(Path("/bin"))
+        )._get_branch_reference(branchname=branch, current_path="test_curr_path")
 
         # Then
         mock_execute.assert_called_once_with(
             ["git", "rev-parse", "--symbolic-full-name", branch],
-            cwd=os.path.join("/bin", "test_curr_path"),
+            cwd=str(Path("/bin") / "test_curr_path"),
         )
         assert actual_response is None
 
@@ -331,17 +338,18 @@ async def test_get_current_branch_failure():
 
         # When
         with pytest.raises(Exception) as error:
-            await Git(FakeContentManager("/bin")).get_current_branch(
+            await Git(FakeContentManager(Path("/bin"))).get_current_branch(
                 current_path="test_curr_path"
             )
 
         # Then
         mock_execute.assert_called_once_with(
-            ["git", "symbolic-ref", "HEAD"], cwd=os.path.join("/bin", "test_curr_path")
+            ["git", "symbolic-ref", "--short", "HEAD"],
+            cwd=str(Path("/bin") / "test_curr_path"),
         )
         assert (
             "Error [fatal: Not a git repository (or any of the parent directories): .git] "
-            "occurred while executing [git symbolic-ref HEAD] command to get current branch."
+            "occurred while executing [git symbolic-ref --short HEAD] command to get current branch."
             == str(error.value)
         )
 
@@ -356,18 +364,17 @@ async def test_get_current_branch_detached_success():
             "  remotes/origin/feature-foo",
             "  remotes/origin/HEAD",
         ]
-        mock_execute.return_value = maybe_future(
-            (0, "\n".join(process_output), "")
-        )
+        mock_execute.return_value = maybe_future((0, "\n".join(process_output), ""))
 
         # When
         actual_response = await Git(
-            FakeContentManager("/bin")
+            FakeContentManager(Path("/bin"))
         )._get_current_branch_detached(current_path="test_curr_path")
 
         # Then
         mock_execute.assert_called_once_with(
-            ["git", "branch", "-a"], cwd=os.path.join("/bin", "test_curr_path")
+            ["git", "branch", "-a"],
+            cwd=str(Path("/bin") / "test_curr_path"),
         )
         assert "(HEAD detached at origin/feature-foo)" == actual_response
 
@@ -386,13 +393,14 @@ async def test_get_current_branch_detached_failure():
 
         # When
         with pytest.raises(Exception) as error:
-            await Git(FakeContentManager("/bin"))._get_current_branch_detached(
+            await Git(FakeContentManager(Path("/bin")))._get_current_branch_detached(
                 current_path="test_curr_path"
             )
 
         # Then
         mock_execute.assert_called_once_with(
-            ["git", "branch", "-a"], cwd=os.path.join("/bin", "test_curr_path")
+            ["git", "branch", "-a"],
+            cwd=str(Path("/bin") / "test_curr_path"),
         )
         assert (
             "Error [fatal: Not a git repository (or any of the parent directories): .git] "
@@ -403,29 +411,52 @@ async def test_get_current_branch_detached_failure():
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "branch,upstream",
+    "branch,upstream,remotename",
     [
-        ("feature-foo", "origin/master"),
-        ("master", "origin/master"),
-        ("feature-bar", "feature-foo"),
+        ("feature-foo", "master", "origin/withslash"),
+        ("master", "master", "origin"),
+        ("feature/bar", "feature-foo", ""),
+        # Test upstream branch name starts with a letter contained in remote name
+        ("rbranch", "rbranch", "origin"),
     ],
 )
-async def test_get_upstream_branch_success(branch, upstream):
+async def test_get_upstream_branch_success(branch, upstream, remotename):
     with patch("jupyterlab_git.git.execute") as mock_execute:
         # Given
-        mock_execute.return_value = maybe_future((0, upstream, ""))
+        mock_execute.side_effect = [
+            maybe_future((0, remotename + "/" + upstream, "")),
+            maybe_future((0, remotename, "")),
+        ]
 
         # When
-        actual_response = await Git(FakeContentManager("/bin")).get_upstream_branch(
-            current_path="test_curr_path", branch_name=branch
-        )
+        actual_response = await Git(
+            FakeContentManager(Path("/bin"))
+        ).get_upstream_branch(current_path="test_curr_path", branch_name=branch)
 
         # Then
-        mock_execute.assert_called_once_with(
-            ["git", "rev-parse", "--abbrev-ref", "{}@{{upstream}}".format(branch)],
-            cwd=os.path.join("/bin", "test_curr_path"),
+        mock_execute.assert_has_calls(
+            [
+                call(
+                    [
+                        "git",
+                        "rev-parse",
+                        "--abbrev-ref",
+                        "{}@{{upstream}}".format(branch),
+                    ],
+                    cwd=str(Path("/bin") / "test_curr_path"),
+                ),
+                call(
+                    ["git", "config", "--local", "branch.{}.remote".format(branch)],
+                    cwd=str(Path("/bin") / "test_curr_path"),
+                ),
+            ],
+            any_order=False,
         )
-        assert upstream == actual_response
+        assert {
+            "code": 0,
+            "remote_branch": upstream,
+            "remote_short_name": remotename,
+        } == actual_response
 
 
 @pytest.mark.asyncio
@@ -454,24 +485,23 @@ async def test_get_upstream_branch_failure(outputs, message):
         mock_execute.return_value = maybe_future(outputs)
 
         # When
-        if message:
-            with pytest.raises(Exception) as error:
-                await Git(FakeContentManager("/bin")).get_upstream_branch(
-                    current_path="test_curr_path", branch_name="blah"
-                )
-            assert message == str(error.value)
-        else:
-            response = await Git(FakeContentManager("/bin")).get_upstream_branch(
-                current_path="test_curr_path", branch_name="blah"
-            )
-            assert response is None
+        response = await Git(FakeContentManager(Path("/bin"))).get_upstream_branch(
+            current_path="test_curr_path", branch_name="blah"
+        )
+        expected = {
+            "code": 128,
+            "command": "git rev-parse --abbrev-ref blah@{upstream}",
+            "message": outputs[2],
+        }
+
+        assert response == expected
 
         # Then
         mock_execute.assert_has_calls(
             [
                 call(
                     ["git", "rev-parse", "--abbrev-ref", "blah@{upstream}"],
-                    cwd=os.path.join("/bin", "test_curr_path"),
+                    cwd=str(Path("/bin") / "test_curr_path"),
                 )
             ],
             any_order=False,
@@ -485,7 +515,7 @@ async def test_get_tag_success():
         mock_execute.return_value = maybe_future((0, "v0.3.0", ""))
 
         # When
-        actual_response = await Git(FakeContentManager("/bin"))._get_tag(
+        actual_response = await Git(FakeContentManager(Path("/bin")))._get_tag(
             current_path="test_curr_path",
             commit_sha="abcdefghijklmnopqrstuvwxyz01234567890123",
         )
@@ -493,7 +523,7 @@ async def test_get_tag_success():
         # Then
         mock_execute.assert_called_once_with(
             ["git", "describe", "--tags", "abcdefghijklmnopqrstuvwxyz01234567890123"],
-            cwd=os.path.join("/bin", "test_curr_path"),
+            cwd=str(Path("/bin") / "test_curr_path"),
         )
         assert "v0.3.0" == actual_response
 
@@ -515,7 +545,7 @@ async def test_get_tag_failure():
 
         # When
         with pytest.raises(Exception) as error:
-            await Git(FakeContentManager("/bin"))._get_tag(
+            await Git(FakeContentManager(Path("/bin")))._get_tag(
                 current_path="test_curr_path", commit_sha="blah"
             )
 
@@ -525,7 +555,7 @@ async def test_get_tag_failure():
             == str(error.value)
         )
 
-        actual_response = await Git(FakeContentManager("/bin"))._get_tag(
+        actual_response = await Git(FakeContentManager(Path("/bin")))._get_tag(
             current_path="test_curr_path",
             commit_sha="01234567899999abcdefghijklmnopqrstuvwxyz",
         )
@@ -537,7 +567,7 @@ async def test_get_tag_failure():
             [
                 call(
                     ["git", "describe", "--tags", "blah"],
-                    cwd=os.path.join("/bin", "test_curr_path"),
+                    cwd=str(Path("/bin") / "test_curr_path"),
                 ),
                 call(
                     [
@@ -546,7 +576,7 @@ async def test_get_tag_failure():
                         "--tags",
                         "01234567899999abcdefghijklmnopqrstuvwxyz",
                     ],
-                    cwd=os.path.join("/bin", "test_curr_path"),
+                    cwd=str(Path("/bin") / "test_curr_path"),
                 ),
             ],
             any_order=False,
@@ -562,7 +592,7 @@ async def test_no_tags():
         )
 
         # When
-        actual_response = await Git(FakeContentManager("/bin"))._get_tag(
+        actual_response = await Git(FakeContentManager(Path("/bin")))._get_tag(
             "/path/foo", "768c79ad661598889f29bdf8916f4cc488f5062a"
         )
 
@@ -650,7 +680,7 @@ async def test_branch_success():
         }
 
         # When
-        actual_response = await Git(FakeContentManager("/bin")).branch(
+        actual_response = await Git(FakeContentManager(Path("/bin"))).branch(
             current_path="test_curr_path"
         )
 
@@ -665,7 +695,7 @@ async def test_branch_success():
                         "--format=%(refname:short)%09%(objectname)%09%(upstream:short)%09%(HEAD)",
                         "refs/heads/",
                     ],
-                    cwd=os.path.join("/bin", "test_curr_path"),
+                    cwd=str(Path("/bin") / "test_curr_path"),
                 ),
                 # call to get refs/remotes
                 call(
@@ -675,7 +705,7 @@ async def test_branch_success():
                         "--format=%(refname:short)%09%(objectname)",
                         "refs/remotes/",
                     ],
-                    cwd=os.path.join("/bin", "test_curr_path"),
+                    cwd=str(Path("/bin") / "test_curr_path"),
                 ),
             ],
             any_order=False,
@@ -708,13 +738,14 @@ async def test_branch_failure():
         }
 
         # When
-        actual_response = await Git(FakeContentManager("/bin")).branch(
+        actual_response = await Git(FakeContentManager(Path("/bin"))).branch(
             current_path="test_curr_path"
         )
 
         # Then
         mock_execute.assert_called_once_with(
-            expected_cmd, cwd=os.path.join("/bin", "test_curr_path")
+            expected_cmd,
+            cwd=str(Path("/bin") / "test_curr_path"),
         )
 
         assert expected_response == actual_response
@@ -740,9 +771,7 @@ async def test_branch_success_detached_head():
             # Response for get all refs/heads
             maybe_future((0, "\n".join(process_output_heads), "")),
             # Response for get current branch
-            maybe_future(
-                (128, "", "fatal: ref HEAD is not a symbolic ref")
-            ),
+            maybe_future((128, "", "fatal: ref HEAD is not a symbolic ref")),
             # Response for get current branch detached
             maybe_future((0, "\n".join(detached_head_output), "")),
             # Response for get all refs/remotes
@@ -788,7 +817,7 @@ async def test_branch_success_detached_head():
         }
 
         # When
-        actual_response = await Git(FakeContentManager("/bin")).branch(
+        actual_response = await Git(FakeContentManager(Path("/bin"))).branch(
             current_path="test_curr_path"
         )
 
@@ -803,16 +832,17 @@ async def test_branch_success_detached_head():
                         "--format=%(refname:short)%09%(objectname)%09%(upstream:short)%09%(HEAD)",
                         "refs/heads/",
                     ],
-                    cwd=os.path.join("/bin", "test_curr_path"),
+                    cwd=str(Path("/bin") / "test_curr_path"),
                 ),
                 # call to get current branch
                 call(
-                    ["git", "symbolic-ref", "HEAD"],
-                    cwd=os.path.join("/bin", "test_curr_path"),
+                    ["git", "symbolic-ref", "--short", "HEAD"],
+                    cwd=str(Path("/bin") / "test_curr_path"),
                 ),
                 # call to get current branch name given a detached head
                 call(
-                    ["git", "branch", "-a"], cwd=os.path.join("/bin", "test_curr_path")
+                    ["git", "branch", "-a"],
+                    cwd=str(Path("/bin") / "test_curr_path"),
                 ),
                 # call to get refs/remotes
                 call(
@@ -822,7 +852,7 @@ async def test_branch_success_detached_head():
                         "--format=%(refname:short)%09%(objectname)",
                         "refs/remotes/",
                     ],
-                    cwd=os.path.join("/bin", "test_curr_path"),
+                    cwd=str(Path("/bin") / "test_curr_path"),
                 ),
             ],
             any_order=False,

@@ -1,84 +1,166 @@
-import * as React from 'react';
-import Tabs from '@material-ui/core/Tabs';
-import Tab from '@material-ui/core/Tab';
-import { showErrorMessage, showDialog } from '@jupyterlab/apputils';
+import { showDialog } from '@jupyterlab/apputils';
+import { PathExt } from '@jupyterlab/coreutils';
+import { FileBrowserModel } from '@jupyterlab/filebrowser';
 import { ISettingRegistry } from '@jupyterlab/settingregistry';
-import { IRenderMimeRegistry } from '@jupyterlab/rendermime';
+import { CommandRegistry } from '@lumino/commands';
 import { JSONObject } from '@lumino/coreutils';
+import { Signal } from '@lumino/signaling';
+import Tab from '@material-ui/core/Tab';
+import Tabs from '@material-ui/core/Tabs';
+import * as React from 'react';
+import { CommandIDs } from '../commandsAndMenu';
+import { Logger } from '../logger';
 import { GitExtension } from '../model';
 import {
   panelWrapperClass,
   repoButtonClass,
   selectedTabClass,
   tabClass,
-  tabsClass,
   tabIndicatorClass,
-  warningWrapperClass
+  tabsClass,
+  warningTextClass
 } from '../style/GitPanel';
-import { Git } from '../tokens';
+import { Git, ILogMessage, Level } from '../tokens';
 import { GitAuthorForm } from '../widgets/AuthorBox';
+import { CommitBox } from './CommitBox';
 import { FileList } from './FileList';
 import { HistorySideBar } from './HistorySideBar';
 import { Toolbar } from './Toolbar';
-import { CommitBox } from './CommitBox';
 
-/** Interface for GitPanel component state */
-export interface IGitSessionNodeState {
-  branches: Git.IBranch[];
-  currentBranch: string;
-  files: Git.IStatusFile[];
-  inGitRepository: boolean;
-  pastCommits: Git.ISingleCommitInfo[];
-  tab: number;
-}
+/**
+ * Interface describing component properties.
+ */
+export interface IGitPanelProps {
+  /**
+   * Jupyter App commands registry
+   */
+  commands: CommandRegistry;
 
-/** Interface for GitPanel component props */
-export interface IGitSessionNodeProps {
+  /**
+   * File browser model.
+   */
+  filebrowser: FileBrowserModel;
+
+  /**
+   * Extension logger
+   */
+  logger: Logger;
+
+  /**
+   * Git extension data model.
+   */
   model: GitExtension;
-  renderMime: IRenderMimeRegistry;
+
+  /**
+   * Git extension settings.
+   */
   settings: ISettingRegistry.ISettings;
 }
 
-/** A React component for the git extension's main display */
-export class GitPanel extends React.Component<
-  IGitSessionNodeProps,
-  IGitSessionNodeState
-> {
-  constructor(props: IGitSessionNodeProps) {
+/**
+ * Interface describing component state.
+ */
+export interface IGitPanelState {
+  /**
+   * Git path repository
+   */
+  repository: string | null;
+
+  /**
+   * List of branches.
+   */
+  branches: Git.IBranch[];
+
+  /**
+   * Current branch.
+   */
+  currentBranch: string;
+
+  /**
+   * List of changed files.
+   */
+  files: Git.IStatusFile[];
+
+  /**
+   * Number of commits ahead
+   */
+  nCommitsAhead: number;
+
+  /**
+   * Number of commits behind
+   */
+  nCommitsBehind: number;
+
+  /**
+   * List of prior commits.
+   */
+  pastCommits: Git.ISingleCommitInfo[];
+
+  /**
+   * Panel tab identifier.
+   */
+  tab: number;
+}
+
+/**
+ * React component for rendering a panel for performing Git operations.
+ */
+export class GitPanel extends React.Component<IGitPanelProps, IGitPanelState> {
+  /**
+   * Returns a React component for rendering a panel for performing Git operations.
+   *
+   * @param props - component properties
+   * @returns React component
+   */
+  constructor(props: IGitPanelProps) {
     super(props);
+    const { branches, currentBranch, pathRepository } = props.model;
+
     this.state = {
-      branches: [],
-      currentBranch: '',
+      branches: branches,
+      currentBranch: currentBranch ? currentBranch.name : 'master',
       files: [],
-      inGitRepository: false,
+      nCommitsAhead: 0,
+      nCommitsBehind: 0,
       pastCommits: [],
+      repository: pathRepository,
       tab: 0
     };
   }
 
-  componentDidMount() {
+  /**
+   * Callback invoked immediately after mounting a component (i.e., inserting into a tree).
+   */
+  componentDidMount(): void {
     const { model, settings } = this.props;
 
     model.repositoryChanged.connect((_, args) => {
       this.setState({
-        inGitRepository: args.newValue !== null
+        repository: args.newValue
       });
-      this.refresh();
+      this.refreshView();
     }, this);
     model.statusChanged.connect(() => {
-      this.setState({ files: model.status });
+      this.setState({
+        files: model.status.files,
+        nCommitsAhead: model.status.ahead,
+        nCommitsBehind: model.status.behind
+      });
     }, this);
     model.headChanged.connect(async () => {
       await this.refreshBranch();
       if (this.state.tab === 1) {
         this.refreshHistory();
-      } else {
-        this.refreshStatus();
       }
     }, this);
-    model.markChanged.connect(() => this.forceUpdate());
+    model.markChanged.connect(() => this.forceUpdate(), this);
 
-    settings.changed.connect(this.refresh, this);
+    settings.changed.connect(this.refreshView, this);
+  }
+
+  componentWillUnmount(): void {
+    // Clear all signal connections
+    Signal.clearData(this);
   }
 
   refreshBranch = async () => {
@@ -107,18 +189,13 @@ export class GitPanel extends React.Component<
     }
   };
 
-  refreshStatus = async () => {
-    await this.props.model.refreshStatus();
-  };
-
   /**
    * Refresh widget, update all content
    */
-  refresh = async () => {
+  refreshView = async () => {
     if (this.props.model.pathRepository !== null) {
       await this.refreshBranch();
       await this.refreshHistory();
-      await this.refreshStatus();
     }
   };
 
@@ -129,8 +206,13 @@ export class GitPanel extends React.Component<
    * @returns a promise which commits the files
    */
   commitMarkedFiles = async (message: string): Promise<void> => {
+    this.props.logger.log({
+      level: Level.RUNNING,
+      message: 'Staging files...'
+    });
     await this.props.model.reset();
     await this.props.model.add(...this._markedFiles.map(file => file.to));
+
     await this.commitStagedFiles(message);
   };
 
@@ -141,17 +223,37 @@ export class GitPanel extends React.Component<
    * @returns a promise which commits the files
    */
   commitStagedFiles = async (message: string): Promise<void> => {
+    if (!message) {
+      return;
+    }
+
+    const errorLog: ILogMessage = {
+      level: Level.ERROR,
+      message: 'Failed to commit changes.'
+    };
+
     try {
-      if (
-        message &&
-        message !== '' &&
-        (await this._hasIdentity(this.props.model.pathRepository))
-      ) {
-        await this.props.model.commit(message);
+      const res = await this._hasIdentity(this.props.model.pathRepository);
+
+      if (!res) {
+        this.props.logger.log(errorLog);
+        return;
       }
+
+      this.props.logger.log({
+        level: Level.RUNNING,
+        message: 'Committing changes...'
+      });
+
+      await this.props.model.commit(message);
+
+      this.props.logger.log({
+        level: Level.SUCCESS,
+        message: 'Committed changes.'
+      });
     } catch (error) {
       console.error(error);
-      showErrorMessage('Fail to commit', error);
+      this.props.logger.log({ ...errorLog, error });
     }
   };
 
@@ -163,8 +265,14 @@ export class GitPanel extends React.Component<
   render(): React.ReactElement {
     return (
       <div className={panelWrapperClass}>
-        {this._renderToolbar()}
-        {this._renderMain()}
+        {this.state.repository ? (
+          <React.Fragment>
+            {this._renderToolbar()}
+            {this._renderMain()}
+          </React.Fragment>
+        ) : (
+          this._renderWarning()
+        )}
       </div>
     );
   }
@@ -181,9 +289,15 @@ export class GitPanel extends React.Component<
     );
     return (
       <Toolbar
-        model={this.props.model}
+        currentBranch={this.state.currentBranch}
+        branches={this.state.branches}
         branching={!disableBranching}
-        refresh={this._onRefresh}
+        commands={this.props.commands}
+        logger={this.props.logger}
+        model={this.props.model}
+        nCommitsAhead={this.state.nCommitsAhead}
+        nCommitsBehind={this.state.nCommitsBehind}
+        repository={this.state.repository || ''}
       />
     );
   }
@@ -194,15 +308,12 @@ export class GitPanel extends React.Component<
    * @returns React element
    */
   private _renderMain(): React.ReactElement {
-    if (this.state.inGitRepository) {
-      return (
-        <React.Fragment>
-          {this._renderTabs()}
-          {this.state.tab === 1 ? this._renderHistory() : this._renderChanges()}
-        </React.Fragment>
-      );
-    }
-    return this._renderWarning();
+    return (
+      <React.Fragment>
+        {this._renderTabs()}
+        {this.state.tab === 1 ? this._renderHistory() : this._renderChanges()}
+      </React.Fragment>
+    );
   }
 
   /**
@@ -255,18 +366,20 @@ export class GitPanel extends React.Component<
         <FileList
           files={this._sortedFiles}
           model={this.props.model}
-          renderMime={this.props.renderMime}
+          commands={this.props.commands}
           settings={this.props.settings}
         />
         {this.props.settings.composite['simpleStaging'] ? (
           <CommitBox
             hasFiles={this._markedFiles.length > 0}
             onCommit={this.commitMarkedFiles}
+            commands={this.props.commands}
           />
         ) : (
           <CommitBox
             hasFiles={this._hasStagedFile()}
             onCommit={this.commitStagedFiles}
+            commands={this.props.commands}
           />
         )}
       </React.Fragment>
@@ -284,7 +397,7 @@ export class GitPanel extends React.Component<
         branches={this.state.branches}
         commits={this.state.pastCommits}
         model={this.props.model}
-        renderMime={this.props.renderMime}
+        commands={this.props.commands}
       />
     );
   }
@@ -295,18 +408,45 @@ export class GitPanel extends React.Component<
    * @returns React element
    */
   private _renderWarning(): React.ReactElement {
+    const path = this.props.filebrowser.path;
+    const { commands } = this.props;
+
     return (
-      <div className={warningWrapperClass}>
-        <div>Unable to detect a Git repository.</div>
+      <React.Fragment>
+        <div className={warningTextClass}>
+          {path ? (
+            <React.Fragment>
+              <b title={path}>{PathExt.basename(path)}</b> is not
+            </React.Fragment>
+          ) : (
+            'You are not currently in'
+          )}
+          {
+            ' a Git repository. To use Git, navigate to a local repository, initialize a repository here, or clone an existing repository.'
+          }
+        </div>
         <button
           className={repoButtonClass}
-          onClick={() =>
-            this.props.model.commands.execute('filebrowser:toggle-main')
-          }
+          onClick={() => commands.execute('filebrowser:toggle-main')}
         >
-          Find a repository
+          Open the FileBrowser
         </button>
-      </div>
+        <button
+          className={repoButtonClass}
+          onClick={() => commands.execute(CommandIDs.gitInit)}
+        >
+          Initialize a Repository
+        </button>
+        <button
+          className={repoButtonClass}
+          onClick={async () => {
+            await commands.execute(CommandIDs.gitClone);
+            await commands.execute('filebrowser:toggle-main');
+          }}
+        >
+          Clone a Repository
+        </button>
+      </React.Fragment>
     );
   }
 
@@ -326,20 +466,6 @@ export class GitPanel extends React.Component<
   };
 
   /**
-   * Callback invoked upon refreshing a repository.
-   *
-   * @returns promise which refreshes a repository
-   */
-  private _onRefresh = async () => {
-    await this.refreshBranch();
-    if (this.state.tab === 1) {
-      this.refreshHistory();
-    } else {
-      this.refreshStatus();
-    }
-  };
-
-  /**
    * Determines whether a user has a known Git identity.
    *
    * @param path - repository path
@@ -349,33 +475,35 @@ export class GitPanel extends React.Component<
     // If the repository path changes, check the user identity
     if (path !== this._previousRepoPath) {
       try {
-        let res = await this.props.model.config();
-        if (res.ok) {
-          const options: JSONObject = (await res.json()).options;
-          const keys = Object.keys(options);
+        const data: JSONObject = (await this.props.model.config()) as any;
+        const options: JSONObject = data['options'] as JSONObject;
+        const keys = Object.keys(options);
 
-          // If the user name or e-mail is unknown, ask the user to set it
-          if (keys.indexOf('user.name') < 0 || keys.indexOf('user.email') < 0) {
-            const result = await showDialog({
-              title: 'Who is committing?',
-              body: new GitAuthorForm()
-            });
-            if (!result.button.accept) {
-              console.log('User refuses to set identity.');
-              return false;
-            }
-            const identity = result.value;
-            res = await this.props.model.config({
+        // If the user name or e-mail is unknown, ask the user to set it
+        if (keys.indexOf('user.name') < 0 || keys.indexOf('user.email') < 0) {
+          const result = await showDialog({
+            title: 'Who is committing?',
+            body: new GitAuthorForm()
+          });
+          if (!result.button.accept) {
+            console.log('User refuses to set identity.');
+            return false;
+          }
+          const identity = result.value;
+          try {
+            await this.props.model.config({
               'user.name': identity.name,
               'user.email': identity.email
             });
-            if (!res.ok) {
-              console.log(await res.text());
+          } catch (error) {
+            if (error instanceof Git.GitResponseError) {
+              console.log(error);
               return false;
             }
+            throw error;
           }
-          this._previousRepoPath = path;
         }
+        this._previousRepoPath = path;
       } catch (error) {
         throw new Error('Failed to set your identity. ' + error.message);
       }
@@ -384,11 +512,15 @@ export class GitPanel extends React.Component<
   }
 
   private _hasStagedFile(): boolean {
-    return this.state.files.some(file => file.status === 'staged');
+    return this.state.files.some(
+      file => file.status === 'staged' || file.status === 'partially-staged'
+    );
   }
 
   private _hasUnStagedFile(): boolean {
-    return this.state.files.some(file => file.status === 'unstaged');
+    return this.state.files.some(
+      file => file.status === 'unstaged' || file.status === 'partially-staged'
+    );
   }
 
   /**

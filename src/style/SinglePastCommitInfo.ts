@@ -38,10 +38,13 @@ export const commitDetailHeaderClass = style({
 export const commitDetailFileClass = style({
   display: 'flex',
   flexDirection: 'row',
+  alignItems: 'center',
   color: 'var(--jp-ui-font-color1)',
   height: 'var(--jp-private-running-item-height)',
   lineHeight: 'var(--jp-private-running-item-height)',
   whiteSpace: 'nowrap',
+
+  overflow: 'hidden',
 
   $nest: {
     '&:hover': {
@@ -63,7 +66,7 @@ export const iconClass = style({
 export const insertionsIconClass = style({
   $nest: {
     '.jp-icon3': {
-      fill: '#00dc00'
+      fill: 'var(--md-green-500)'
     }
   }
 });
@@ -71,24 +74,9 @@ export const insertionsIconClass = style({
 export const deletionsIconClass = style({
   $nest: {
     '.jp-icon3': {
-      fill: '#ff0000'
+      fill: 'var(--md-red-500)'
     }
   }
-});
-
-export const diffIconClass = style({
-  backgroundColor: 'transparent',
-  backgroundPosition: 'center',
-  backgroundRepeat: 'no-repeat',
-  backgroundImage: 'var(--jp-icon-diff)',
-  border: 'none',
-  outline: 'none',
-  width: '2px'
-});
-
-export const revertButtonClass = style({
-  backgroundImage: 'var(--jp-icon-rewind)',
-  marginLeft: '6px'
 });
 
 export const fileListClass = style({

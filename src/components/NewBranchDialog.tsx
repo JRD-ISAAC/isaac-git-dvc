@@ -1,12 +1,12 @@
-import * as React from 'react';
-import { classes } from 'typestyle';
-import List from '@material-ui/core/List';
-import ListItem from '@material-ui/core/ListItem';
 import Dialog from '@material-ui/core/Dialog';
 import DialogActions from '@material-ui/core/DialogActions';
+import ListItem from '@material-ui/core/ListItem';
 import ClearIcon from '@material-ui/icons/Clear';
-import { showErrorMessage } from '@jupyterlab/apputils';
-import { Git, IGitExtension } from '../tokens';
+import * as React from 'react';
+import { ListChildComponentProps, VariableSizeList } from 'react-window';
+import { classes } from 'typestyle';
+import { Logger } from '../logger';
+import { branchIcon } from '../style/icons';
 import {
   actionsWrapperClass,
   activeListItemClass,
@@ -16,6 +16,7 @@ import {
   closeButtonClass,
   contentWrapperClass,
   createButtonClass,
+  errorMessageClass,
   filterClass,
   filterClearClass,
   filterInputClass,
@@ -31,6 +32,7 @@ import {
   titleClass,
   titleWrapperClass
 } from '../style/NewBranchDialog';
+import { Git, IGitExtension, Level } from '../tokens';
 
 const BRANCH_DESC = {
   current:
@@ -39,10 +41,29 @@ const BRANCH_DESC = {
     'The default branch. Pick this if you want to start fresh from the default branch.'
 };
 
+const ITEM_HEIGHT = 27.5; // HTML element height for a single branch
+const CURRENT_BRANCH_HEIGHT = 66.5; // HTML element height for the current branch with description
+const HEIGHT = 200; // HTML element height for the branches list
+
 /**
  * Interface describing component properties.
  */
 export interface INewBranchDialogProps {
+  /**
+   * Current branch name.
+   */
+  currentBranch: string;
+
+  /**
+   * Current list of branches.
+   */
+  branches: Git.IBranch[];
+
+  /**
+   * Extension logger
+   */
+  logger: Logger;
+
   /**
    * Git extension data model.
    */
@@ -79,14 +100,9 @@ export interface INewBranchDialogState {
   filter: string;
 
   /**
-   * Current branch name.
+   * Error message.
    */
-  current: string;
-
-  /**
-   * Current list of branches.
-   */
-  branches: Git.IBranch[];
+  error: string;
 }
 
 /**
@@ -104,34 +120,18 @@ export class NewBranchDialog extends React.Component<
    */
   constructor(props: INewBranchDialogProps) {
     super(props);
-
-    const repo = this.props.model.pathRepository;
+    this._branchList = React.createRef<VariableSizeList>();
 
     this.state = {
       name: '',
-      base: repo ? this.props.model.currentBranch.name : '',
+      base: props.currentBranch || '',
       filter: '',
-      current: repo ? this.props.model.currentBranch.name : '',
-      branches: repo ? this.props.model.branches : []
+      error: ''
     };
   }
 
   /**
-   * Callback invoked immediately after mounting a component (i.e., inserting into a tree).
-   */
-  componentDidMount(): void {
-    this._addListeners();
-  }
-
-  /**
-   * Callback invoked when a component will no longer be mounted.
-   */
-  componentWillUnmount(): void {
-    this._removeListeners();
-  }
-
-  /**
-   * Renders the component.
+   * Renders a dialog for creating a new branch.
    *
    * @returns React element
    */
@@ -155,6 +155,9 @@ export class NewBranchDialog extends React.Component<
           </button>
         </div>
         <div className={contentWrapperClass}>
+          {this.state.error ? (
+            <p className={errorMessageClass}>{this.state.error}</p>
+          ) : null}
           <p>Name</p>
           <input
             className={nameInputClass}
@@ -186,9 +189,7 @@ export class NewBranchDialog extends React.Component<
               ) : null}
             </div>
           </div>
-          <div className={listWrapperClass}>
-            <List disablePadding>{this._renderItems()}</List>
-          </div>
+          {this._renderItems()}
         </div>
         <DialogActions className={actionsWrapperClass}>
           <input
@@ -204,6 +205,7 @@ export class NewBranchDialog extends React.Component<
             title="Create a new branch"
             value="Create Branch"
             onClick={this._onCreate}
+            disabled={this.state.name === '' || this.state.error !== ''}
           />
         </DialogActions>
       </Dialog>
@@ -215,12 +217,35 @@ export class NewBranchDialog extends React.Component<
    *
    * @returns array of React elements
    */
-  private _renderItems(): React.ReactElement[] {
-    const current = this.props.model.currentBranch.name;
-    return this.state.branches
+  private _renderItems(): JSX.Element {
+    const current = this.props.currentBranch;
+    // Perform a "simple" filter... (TODO: consider implementing fuzzy filtering)
+    const filter = this.state.filter;
+    const branches = this.props.branches
+      .filter(branch => !filter || branch.name.includes(filter))
       .slice()
-      .sort(comparator)
-      .map(this._renderItem, this);
+      .sort(comparator);
+    return (
+      <VariableSizeList
+        className={listWrapperClass}
+        height={HEIGHT}
+        estimatedItemSize={ITEM_HEIGHT}
+        itemCount={branches.length}
+        itemData={branches}
+        itemKey={(index, data) => data[index].name}
+        itemSize={index => {
+          const branch = branches[index];
+          return branch.name === this.props.currentBranch
+            ? CURRENT_BRANCH_HEIGHT
+            : ITEM_HEIGHT;
+        }}
+        ref={this._branchList}
+        style={{ overflowX: 'hidden' }}
+        width={'auto'}
+      >
+        {this._renderItem}
+      </VariableSizeList>
+    );
 
     /**
      * Comparator function for sorting branches.
@@ -241,6 +266,11 @@ export class NewBranchDialog extends React.Component<
       } else if (b.name === 'master') {
         return 1;
       }
+      if (a.name === 'main') {
+        return -1;
+      } else if (b.name === 'main') {
+        return 1;
+      }
       return 0;
     }
   }
@@ -248,24 +278,18 @@ export class NewBranchDialog extends React.Component<
   /**
    * Renders a branch menu item.
    *
-   * @param branch - branch
-   * @param idx - item index
+   * @param props Row properties
    * @returns React element
    */
-  private _renderItem(
-    branch: Git.IBranch,
-    idx: number
-  ): React.ReactElement | null {
-    // Perform a "simple" filter... (TODO: consider implementing fuzzy filtering)
-    if (this.state.filter && !branch.name.includes(this.state.filter)) {
-      return null;
-    }
-    const isBase = branch.name === this.state.base;
-    const isCurr = branch.name === this.state.current;
+  private _renderItem = (props: ListChildComponentProps): JSX.Element => {
+    const { data, index, style } = props;
+    const branch = data[index] as Git.IBranch;
+
+    const isCurrent = branch.name === this.props.currentBranch;
 
     let isBold;
     let desc;
-    if (isCurr) {
+    if (isCurrent) {
       isBold = true;
       desc = BRANCH_DESC['current'];
     }
@@ -273,11 +297,14 @@ export class NewBranchDialog extends React.Component<
       <ListItem
         button
         title={`Create a new branch based on: ${branch.name}`}
-        className={classes(listItemClass, isBase ? activeListItemClass : null)}
-        key={branch.name}
+        className={classes(
+          listItemClass,
+          isCurrent ? activeListItemClass : null
+        )}
         onClick={this._onBranchClickFactory(branch.name)}
+        style={style}
       >
-        <span className={classes(listItemIconClass, 'jp-Icon-16')} />
+        <branchIcon.react className={listItemIconClass} tag="span" />
         <div className={listItemContentClass}>
           <p
             className={classes(
@@ -291,38 +318,7 @@ export class NewBranchDialog extends React.Component<
         </div>
       </ListItem>
     );
-  }
-
-  /**
-   * Adds model listeners.
-   */
-  private _addListeners(): void {
-    // When the HEAD changes, decent probability that we've switched branches:
-    this.props.model.headChanged.connect(this._syncState, this);
-
-    // When the status changes, we may have checked out a new branch (e.g., via the command-line and not via the extension) or changed repositories:
-    this.props.model.statusChanged.connect(this._syncState, this);
-  }
-
-  /**
-   * Removes model listeners.
-   */
-  private _removeListeners(): void {
-    this.props.model.headChanged.disconnect(this._syncState, this);
-    this.props.model.statusChanged.disconnect(this._syncState, this);
-  }
-
-  /**
-   * Syncs the component state with the underlying model.
-   */
-  private _syncState(): void {
-    const repo = this.props.model.pathRepository;
-    this.setState({
-      base: repo ? this.state.base : '',
-      current: repo ? this.props.model.currentBranch.name : '',
-      branches: repo ? this.props.model.branches : []
-    });
-  }
+  };
 
   /**
    * Callback invoked upon closing the dialog.
@@ -333,7 +329,8 @@ export class NewBranchDialog extends React.Component<
     this.props.onClose();
     this.setState({
       name: '',
-      filter: ''
+      filter: '',
+      error: ''
     });
   };
 
@@ -343,6 +340,7 @@ export class NewBranchDialog extends React.Component<
    * @param event - event object
    */
   private _onFilterChange = (event: any): void => {
+    this._branchList.current.resetAfterIndex(0);
     this.setState({
       filter: event.target.value
     });
@@ -352,6 +350,7 @@ export class NewBranchDialog extends React.Component<
    * Callback invoked to reset the menu filter.
    */
   private _resetFilter = (): void => {
+    this._branchList.current.resetAfterIndex(0);
     this.setState({
       filter: ''
     });
@@ -387,7 +386,8 @@ export class NewBranchDialog extends React.Component<
    */
   private _onNameChange = (event: any): void => {
     this.setState({
-      name: event.target.value
+      name: event.target.value,
+      error: ''
     });
   };
 
@@ -397,56 +397,53 @@ export class NewBranchDialog extends React.Component<
    * @param event - event object
    */
   private _onCreate = (): void => {
-    const branch = this.state.name;
-
-    // Close the branch dialog:
-    this.props.onClose();
-
-    // Reset the branch name and filter:
-    this.setState({
-      name: '',
-      filter: ''
-    });
-
     // Create the branch:
-    this._createBranch(branch);
+    this._createBranch(this.state.name);
   };
 
   /**
    * Creates a new branch.
    *
    * @param branch - branch name
+   * @returns promise which resolves upon attempting to create a new branch
    */
-  private _createBranch(branch: string): void {
+  private async _createBranch(branch: string): Promise<void> {
     const opts = {
       newBranch: true,
       branchname: branch
     };
-    this.props.model
-      .checkout(opts)
-      .then(onResolve)
-      .catch(onError);
 
-    /**
-     * Callback invoked upon promise resolution.
-     *
-     * @private
-     * @param result - result
-     */
-    function onResolve(result: any): void {
-      if (result.code !== 0) {
-        showErrorMessage('Error creating branch', result.message);
-      }
+    this.props.logger.log({
+      level: Level.RUNNING,
+      message: 'Creating branch...'
+    });
+    try {
+      await this.props.model.checkout(opts);
+    } catch (err) {
+      this.setState({
+        error: err.message.replace(/^fatal:/, '')
+      });
+      this.props.logger.log({
+        level: Level.ERROR,
+        message: 'Failed to create branch.'
+      });
+      return;
     }
 
-    /**
-     * Callback invoked upon encountering an error.
-     *
-     * @private
-     * @param err - error
-     */
-    function onError(err: any): void {
-      showErrorMessage('Error creating branch', err.message);
-    }
+    this.props.logger.log({
+      level: Level.SUCCESS,
+      message: 'Branch created.'
+    });
+    // Close the branch dialog:
+    this.props.onClose();
+
+    // Reset the branch name and filter:
+    this._branchList.current.resetAfterIndex(0);
+    this.setState({
+      name: '',
+      filter: ''
+    });
   }
+
+  private _branchList: React.RefObject<VariableSizeList>;
 }

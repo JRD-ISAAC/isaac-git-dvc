@@ -1,4 +1,4 @@
-import os
+from pathlib import Path
 from unittest.mock import Mock, call, patch
 
 import pytest
@@ -19,14 +19,14 @@ async def test_git_pull_fail():
             )
 
             # When
-            actual_response = await Git(FakeContentManager("/bin")).pull(
+            actual_response = await Git(FakeContentManager(Path("/bin"))).pull(
                 "test_curr_path"
             )
 
             # Then
             mock_execute.assert_called_once_with(
                 ["git", "pull", "--no-commit"],
-                cwd=os.path.join("/bin", "test_curr_path"),
+                cwd=str(Path("/bin") / "test_curr_path"),
                 env={"TEST": "test", "GIT_TERMINAL_PROMPT": "0"},
             )
             assert {"code": 1, "message": "Authentication failed"} == actual_response
@@ -37,20 +37,33 @@ async def test_git_pull_with_conflict_fail():
     with patch("os.environ", {"TEST": "test"}):
         with patch("jupyterlab_git.git.execute") as mock_execute:
             # Given
-            mock_execute.return_value = maybe_future((1, "", "Automatic merge failed; fix conflicts and then commit the result."))
+            mock_execute.return_value = maybe_future(
+                (
+                    1,
+                    "",
+                    "Automatic merge failed; fix conflicts and then commit the result.",
+                )
+            )
 
             # When
-            actual_response = await Git(FakeContentManager("/bin")).pull("test_curr_path")
+            actual_response = await Git(FakeContentManager(Path("/bin"))).pull(
+                "test_curr_path"
+            )
 
             # Then
-            mock_execute.assert_has_calls([
-                call(
-                    ["git", "pull", "--no-commit"],
-                    cwd="/bin/test_curr_path",
-                    env={"TEST": "test", "GIT_TERMINAL_PROMPT": "0"},
-                )
-            ]);
-            assert {"code": 1, "message": "Automatic merge failed; fix conflicts and then commit the result."} == actual_response
+            mock_execute.assert_has_calls(
+                [
+                    call(
+                        ["git", "pull", "--no-commit"],
+                        cwd=str(Path("/bin") / "test_curr_path"),
+                        env={"TEST": "test", "GIT_TERMINAL_PROMPT": "0"},
+                    )
+                ]
+            )
+            assert {
+                "code": 1,
+                "message": "Automatic merge failed; fix conflicts and then commit the result.",
+            } == actual_response
 
 
 @pytest.mark.asyncio
@@ -68,7 +81,7 @@ async def test_git_pull_with_auth_fail():
 
             # When
             auth = {"username": "asdf", "password": "qwerty"}
-            actual_response = await Git(FakeContentManager("/bin")).pull(
+            actual_response = await Git(FakeContentManager(Path("/bin"))).pull(
                 "test_curr_path", auth
             )
 
@@ -77,7 +90,7 @@ async def test_git_pull_with_auth_fail():
                 ["git", "pull", "--no-commit"],
                 username="asdf",
                 password="qwerty",
-                cwd=os.path.join("/bin", "test_curr_path"),
+                cwd=str(Path("/bin") / "test_curr_path"),
                 env={"TEST": "test", "GIT_TERMINAL_PROMPT": "1"},
             )
             assert {
@@ -92,20 +105,21 @@ async def test_git_pull_success():
     with patch("os.environ", {"TEST": "test"}):
         with patch("jupyterlab_git.git.execute") as mock_execute:
             # Given
-            mock_execute.return_value = maybe_future((0, "output", ""))
+            output = "output"
+            mock_execute.return_value = maybe_future((0, output, ""))
 
             # When
-            actual_response = await Git(FakeContentManager("/bin")).pull(
+            actual_response = await Git(FakeContentManager(Path("/bin"))).pull(
                 "test_curr_path"
             )
 
             # Then
             mock_execute.assert_called_once_with(
                 ["git", "pull", "--no-commit"],
-                cwd=os.path.join("/bin", "test_curr_path"),
+                cwd=str(Path("/bin") / "test_curr_path"),
                 env={"TEST": "test", "GIT_TERMINAL_PROMPT": "0"},
             )
-            assert {"code": 0} == actual_response
+            assert {"code": 0, "message": output} == actual_response
 
 
 @pytest.mark.asyncio
@@ -114,13 +128,14 @@ async def test_git_pull_with_auth_success():
     with patch("os.environ", {"TEST": "test"}):
         with patch("jupyterlab_git.git.execute") as mock_execute_with_authentication:
             # Given
+            output = "output"
             mock_execute_with_authentication.return_value = maybe_future(
-                (0, "", "output")
+                (0, output, "")
             )
 
             # When
             auth = {"username": "asdf", "password": "qwerty"}
-            actual_response = await Git(FakeContentManager("/bin")).pull(
+            actual_response = await Git(FakeContentManager(Path("/bin"))).pull(
                 "test_curr_path", auth
             )
 
@@ -129,10 +144,10 @@ async def test_git_pull_with_auth_success():
                 ["git", "pull", "--no-commit"],
                 username="asdf",
                 password="qwerty",
-                cwd=os.path.join("/bin", "test_curr_path"),
+                cwd=str(Path("/bin") / "test_curr_path"),
                 env={"TEST": "test", "GIT_TERMINAL_PROMPT": "1"},
             )
-            assert {"code": 0} == actual_response
+            assert {"code": 0, "message": output} == actual_response
 
 
 @pytest.mark.asyncio
@@ -140,26 +155,36 @@ async def test_git_pull_with_auth_success_and_conflict_fail():
     with patch("os.environ", {"TEST": "test"}):
         with patch("jupyterlab_git.git.execute") as mock_execute_with_authentication:
             # Given
-            mock_execute_with_authentication.return_value = maybe_future((1, "output", "Automatic merge failed; fix conflicts and then commit the result."))
+            mock_execute_with_authentication.return_value = maybe_future(
+                (
+                    1,
+                    "output",
+                    "Automatic merge failed; fix conflicts and then commit the result.",
+                )
+            )
 
             # When
-            auth = {
-                "username" : "asdf", 
-                "password" : "qwerty"
-            }
-            actual_response = await Git(FakeContentManager("/bin")).pull("test_curr_path", auth)
+            auth = {"username": "asdf", "password": "qwerty"}
+            actual_response = await Git(FakeContentManager(Path("/bin"))).pull(
+                "test_curr_path", auth
+            )
 
             # Then
-            mock_execute_with_authentication.assert_has_calls([
-                call(
-                    ["git", "pull", "--no-commit"],
-                    cwd="/bin/test_curr_path",
-                    env={"TEST": "test", "GIT_TERMINAL_PROMPT": "1"},
-                    username="asdf",
-                    password="qwerty"
-                )
-            ])
-            assert {"code": 1, "message": "Automatic merge failed; fix conflicts and then commit the result."} == actual_response
+            mock_execute_with_authentication.assert_has_calls(
+                [
+                    call(
+                        ["git", "pull", "--no-commit"],
+                        cwd=str(Path("/bin") / "test_curr_path"),
+                        env={"TEST": "test", "GIT_TERMINAL_PROMPT": "1"},
+                        username="asdf",
+                        password="qwerty",
+                    )
+                ]
+            )
+            assert {
+                "code": 1,
+                "message": "Automatic merge failed; fix conflicts and then commit the result.",
+            } == actual_response
 
 
 @pytest.mark.asyncio
@@ -172,14 +197,14 @@ async def test_git_push_fail():
             )
 
             # When
-            actual_response = await Git(FakeContentManager("/bin")).push(
+            actual_response = await Git(FakeContentManager(Path("/bin"))).push(
                 "test_origin", "HEAD:test_master", "test_curr_path"
             )
 
             # Then
             mock_execute.assert_called_once_with(
                 ["git", "push", "test_origin", "HEAD:test_master"],
-                cwd=os.path.join("/bin", "test_curr_path"),
+                cwd=str(Path("/bin") / "test_curr_path"),
                 env={"TEST": "test", "GIT_TERMINAL_PROMPT": "0"},
             )
             assert {"code": 1, "message": "Authentication failed"} == actual_response
@@ -201,7 +226,7 @@ async def test_git_push_with_auth_fail():
 
             # When
             auth = {"username": "asdf", "password": "qwerty"}
-            actual_response = await Git(FakeContentManager("/bin")).push(
+            actual_response = await Git(FakeContentManager(Path("/bin"))).push(
                 "test_origin", "HEAD:test_master", "test_curr_path", auth
             )
 
@@ -210,7 +235,7 @@ async def test_git_push_with_auth_fail():
                 ["git", "push", "test_origin", "HEAD:test_master"],
                 username="asdf",
                 password="qwerty",
-                cwd=os.path.join("/bin", "test_curr_path"),
+                cwd=str(Path("/bin") / "test_curr_path"),
                 env={"TEST": "test", "GIT_TERMINAL_PROMPT": "1"},
             )
             assert {
@@ -225,22 +250,21 @@ async def test_git_push_success():
     with patch("os.environ", {"TEST": "test"}):
         with patch("jupyterlab_git.git.execute") as mock_execute:
             # Given
-            mock_execute.return_value = maybe_future(
-                (0, "output", "does not matter")
-            )
+            output = "output"
+            mock_execute.return_value = maybe_future((0, output, "does not matter"))
 
             # When
-            actual_response = await Git(FakeContentManager("/bin")).push(
+            actual_response = await Git(FakeContentManager(Path("/bin"))).push(
                 ".", "HEAD:test_master", "test_curr_path"
             )
 
             # Then
             mock_execute.assert_called_once_with(
                 ["git", "push", ".", "HEAD:test_master"],
-                cwd=os.path.join("/bin", "test_curr_path"),
+                cwd=str(Path("/bin") / "test_curr_path"),
                 env={"TEST": "test", "GIT_TERMINAL_PROMPT": "0"},
             )
-            assert {"code": 0} == actual_response
+            assert {"code": 0, "message": output} == actual_response
 
 
 @pytest.mark.asyncio
@@ -249,13 +273,14 @@ async def test_git_push_with_auth_success():
     with patch("os.environ", {"TEST": "test"}):
         with patch("jupyterlab_git.git.execute") as mock_execute_with_authentication:
             # Given
+            output = "output"
             mock_execute_with_authentication.return_value = maybe_future(
-                (0, "", "does not matter")
+                (0, output, "does not matter")
             )
 
             # When
             auth = {"username": "asdf", "password": "qwerty"}
-            actual_response = await Git(FakeContentManager("/bin")).push(
+            actual_response = await Git(FakeContentManager(Path("/bin"))).push(
                 ".", "HEAD:test_master", "test_curr_path", auth
             )
 
@@ -264,7 +289,7 @@ async def test_git_push_with_auth_success():
                 ["git", "push", ".", "HEAD:test_master"],
                 username="asdf",
                 password="qwerty",
-                cwd=os.path.join("/bin", "test_curr_path"),
+                cwd=str(Path("/bin") / "test_curr_path"),
                 env={"TEST": "test", "GIT_TERMINAL_PROMPT": "1"},
             )
-            assert {"code": 0} == actual_response
+            assert {"code": 0, "message": output} == actual_response

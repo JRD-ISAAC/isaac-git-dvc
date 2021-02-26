@@ -3,35 +3,24 @@ import {
   JupyterFrontEnd,
   JupyterFrontEndPlugin
 } from '@jupyterlab/application';
+import { Dialog, showErrorMessage } from '@jupyterlab/apputils';
 import { IChangedArgs } from '@jupyterlab/coreutils';
-import { ISettingRegistry } from '@jupyterlab/settingregistry';
-import {
-  FileBrowser,
-  FileBrowserModel,
-  IFileBrowserFactory
-} from '@jupyterlab/filebrowser';
+import { IDocumentManager } from '@jupyterlab/docmanager';
+import { FileBrowserModel, IFileBrowserFactory } from '@jupyterlab/filebrowser';
 import { IMainMenu } from '@jupyterlab/mainmenu';
 import { IRenderMimeRegistry } from '@jupyterlab/rendermime';
-import { Menu } from '@lumino/widgets';
-import { addCommands, CommandIDs } from './gitMenuCommands';
+import { ISettingRegistry } from '@jupyterlab/settingregistry';
+import { IStatusBar } from '@jupyterlab/statusbar';
+import { addCommands, createGitMenu } from './commandsAndMenu';
 import { GitExtension } from './model';
-import { IGitExtension } from './tokens';
+import { getServerSettings } from './server';
+import { gitIcon } from './style/icons';
+import { Git, IGitExtension } from './tokens';
 import { addCloneButton } from './widgets/gitClone';
 import { GitWidget } from './widgets/GitWidget';
-import { gitIcon } from './style/icons';
+import { addStatusBarWidget } from './widgets/StatusWidget';
 
 export { Git, IGitExtension } from './tokens';
-
-const RESOURCES = [
-  {
-    text: 'Set Up Remotes',
-    url: 'https://www.atlassian.com/git/tutorials/setting-up-a-repository'
-  },
-  {
-    text: 'Git Documentation',
-    url: 'https://git-scm.com/doc'
-  }
-];
 
 /**
  * The default running sessions extension.
@@ -43,7 +32,9 @@ const plugin: JupyterFrontEndPlugin<IGitExtension> = {
     ILayoutRestorer,
     IFileBrowserFactory,
     IRenderMimeRegistry,
-    ISettingRegistry
+    ISettingRegistry,
+    IDocumentManager,
+    IStatusBar
   ],
   provides: IGitExtension,
   activate,
@@ -64,10 +55,13 @@ async function activate(
   restorer: ILayoutRestorer,
   factory: IFileBrowserFactory,
   renderMime: IRenderMimeRegistry,
-  settingRegistry: ISettingRegistry
+  settingRegistry: ISettingRegistry,
+  docmanager: IDocumentManager,
+  statusBar: IStatusBar
 ): Promise<IGitExtension> {
+  let gitExtension: GitExtension | null = null;
   let settings: ISettingRegistry.ISettings;
-
+  let serverSettings: Git.IServerSettings;
   // Get a reference to the default file browser extension
   const filebrowser = factory.defaultBrowser;
 
@@ -77,8 +71,50 @@ async function activate(
   } catch (error) {
     console.error(`Failed to load settings for the Git Extension.\n${error}`);
   }
+  try {
+    serverSettings = await getServerSettings();
+    const { frontendVersion, gitVersion, serverVersion } = serverSettings;
+
+    // Version validation
+    if (!gitVersion) {
+      throw new Error(
+        'git command not found - please ensure you have Git > 2 installed'
+      );
+    } else {
+      const gitVersion_ = gitVersion.split('.');
+      if (Number.parseInt(gitVersion_[0]) < 2) {
+        throw new Error(`git command version must be > 2; got ${gitVersion}.`);
+      }
+    }
+
+    if (frontendVersion && frontendVersion !== serverVersion) {
+      throw new Error(
+        'The versions of the JupyterLab Git server frontend and backend do not match. ' +
+          `The @jupyterlab/git frontend extension has version: ${frontendVersion} ` +
+          `while the python package has version ${serverVersion}. ` +
+          'Please install identical version of jupyterlab-git Python package and the @jupyterlab/git extension. Try running: pip install --upgrade jupyterlab-git'
+      );
+    }
+  } catch (error) {
+    // If we fall here, nothing will be loaded in the frontend.
+    console.error(
+      'Failed to load the jupyterlab-git server extension settings',
+      error
+    );
+    showErrorMessage(
+      'Failed to load the jupyterlab-git server extension',
+      error.message,
+      [Dialog.warnButton({ label: 'DISMISS' })]
+    );
+    return null;
+  }
   // Create the Git model
-  const gitExtension = new GitExtension(app, settings);
+  gitExtension = new GitExtension(
+    serverSettings.serverRoot,
+    docmanager,
+    app.docRegistry,
+    settings
+  );
 
   // Whenever we restore the application, sync the Git extension path
   Promise.all([app.restored, filebrowser.model.restored]).then(() => {
@@ -96,8 +132,22 @@ async function activate(
 
   // Provided we were able to load application settings, create the extension widgets
   if (settings) {
+    // Add JupyterLab commands
+    addCommands(
+      app,
+      gitExtension,
+      factory.defaultBrowser,
+      settings,
+      renderMime
+    );
+
     // Create the Git widget sidebar
-    const gitPlugin = new GitWidget(gitExtension, settings, renderMime);
+    const gitPlugin = new GitWidget(
+      gitExtension,
+      settings,
+      app.commands,
+      factory.defaultBrowser.model
+    );
     gitPlugin.id = 'jp-git-sessions';
     gitPlugin.title.icon = gitIcon;
     gitPlugin.title.caption = 'Git';
@@ -110,118 +160,68 @@ async function activate(
     // Rank has been chosen somewhat arbitrarily to give priority to the running
     // sessions widget in the sidebar.
     app.shell.add(gitPlugin, 'left', { rank: 200 });
-    app.contextMenu.addItem({
-      command: CommandIDs.dvcFileAdd,
-      selector: '.jp-DirListing-item'
-    });
-    app.contextMenu.addItem({
-      command: CommandIDs.seldonModelDeploy,
-      selector: '.jp-DirListing-item'
-    });
+    // app.contextMenu.addItem({
+    //   command: CommandIDs.dvcFileAdd,
+    //   selector: '.jp-DirListing-item'
+    // });
+    // app.contextMenu.addItem({
+    //   command: CommandIDs.seldonModelDeploy,
+    //   selector: '.jp-DirListing-item'
+    // });
 
     // Add a menu for the plugin
-    mainMenu.addMenu(
-      createGitMenu(app, gitExtension, factory.defaultBrowser, settings),
-      { rank: 60 }
-    );
+    mainMenu.addMenu(createGitMenu(app.commands), { rank: 60 });
 
-    mainMenu.addMenu(
-      createDvcMenu(app, gitExtension, factory.defaultBrowser, settings),
-      { rank: 70 }
-    );
+    // Add a clone button to the file browser extension toolbar
+    addCloneButton(gitExtension, factory.defaultBrowser, app.commands);
 
-    mainMenu.addMenu(
-      createArgoMenu(app, gitExtension, factory.defaultBrowser, settings),
-      { rank: 80 }
-    );
+    // Add the status bar widget
+    addStatusBarWidget(statusBar, gitExtension, settings);
   }
-  // Add a clone button to the file browser extension toolbar
-  addCloneButton(gitExtension, factory.defaultBrowser);
 
   return gitExtension;
 }
 
 /**
- * Add commands and menu items
- */
-function createGitMenu(
-  app: JupyterFrontEnd,
-  gitExtension: IGitExtension,
-  fileBrowser: FileBrowser,
-  settings: ISettingRegistry.ISettings
-): Menu {
-  const { commands } = app;
-  addCommands(app, gitExtension, fileBrowser, settings);
-
-  const menu = new Menu({ commands });
-  menu.title.label = 'Git';
-  [
-    CommandIDs.gitClone,
-    CommandIDs.gitInit,
-    CommandIDs.gitUI,
-    CommandIDs.gitTerminalCommand,
-    CommandIDs.gitAddRemote
-  ].forEach(command => {
-    menu.addItem({ command });
-  });
-
-  const tutorial = new Menu({ commands });
-  tutorial.title.label = ' Tutorial ';
-  RESOURCES.map(args => {
-    tutorial.addItem({
-      args,
-      command: CommandIDs.gitOpenUrl
-    });
-  });
-  menu.addItem({ type: 'submenu', submenu: tutorial });
-
-  menu.addItem({ type: 'separator' });
-
-  menu.addItem({ command: CommandIDs.gitToggleSimpleStaging });
-
-  return menu;
-}
-
-/**
  * Add DVC commands and menu items
  */
-function createDvcMenu(
-  app: JupyterFrontEnd,
-  gitExtension: IGitExtension,
-  fileBrowser: FileBrowser,
-  settings: ISettingRegistry.ISettings
-): Menu {
-  const { commands } = app;
-  // addCommands(app, gitExtension, fileBrowser, settings);
+// function createDvcMenu(
+//   app: JupyterFrontEnd,
+//   gitExtension: IGitExtension,
+//   fileBrowser: FileBrowser,
+//   settings: ISettingRegistry.ISettings
+// ): Menu {
+//   const { commands } = app;
+//   // addCommands(app, gitExtension, fileBrowser, settings);
 
-  const menu = new Menu({ commands });
-  menu.title.label = 'DVC';
-  [CommandIDs.dvcInit, CommandIDs.dvcPull, CommandIDs.dvcPush].forEach(
-    command => {
-      menu.addItem({ command });
-    }
-  );
+//   const menu = new Menu({ commands });
+//   menu.title.label = 'DVC';
+//   [CommandIDs.dvcInit, CommandIDs.dvcPull, CommandIDs.dvcPush].forEach(
+//     command => {
+//       menu.addItem({ command });
+//     }
+//   );
 
-  return menu;
-}
+//   return menu;
+// }
 
-/**
- * Add Argo commands and menu items
- */
-function createArgoMenu(
-  app: JupyterFrontEnd,
-  gitExtension: IGitExtension,
-  fileBrowser: FileBrowser,
-  settings: ISettingRegistry.ISettings
-): Menu {
-  const { commands } = app;
-  // addCommands(app, gitExtension, fileBrowser, settings);
+// /**
+//  * Add Argo commands and menu items
+//  */
+// function createArgoMenu(
+//   app: JupyterFrontEnd,
+//   gitExtension: IGitExtension,
+//   fileBrowser: FileBrowser,
+//   settings: ISettingRegistry.ISettings
+// ): Menu {
+//   const { commands } = app;
+//   // addCommands(app, gitExtension, fileBrowser, settings);
 
-  const menu = new Menu({ commands });
-  menu.title.label = 'ISAAC';
-  [CommandIDs.argoDeploy].forEach(command => {
-    menu.addItem({ command });
-  });
+//   const menu = new Menu({ commands });
+//   menu.title.label = 'ISAAC';
+//   [CommandIDs.argoDeploy].forEach(command => {
+//     menu.addItem({ command });
+//   });
 
-  return menu;
-}
+//   return menu;
+// }
